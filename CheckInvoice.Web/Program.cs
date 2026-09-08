@@ -10,6 +10,12 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Render (y la mayoría de los PaaS con contenedores) asignan el puerto dinámicamente vía la
+// variable de entorno PORT y esperan que el contenedor escuche ahí — un puerto fijo hace que
+// el health check de la plataforma nunca conecte y el deploy se marque como fallido.
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddControllers()
@@ -104,12 +110,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-const string LocalDevCorsPolicy = "LocalDevCorsPolicy";
+const string CorsPolicy = "CorsPolicy";
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(LocalDevCorsPolicy, policy =>
+    options.AddPolicy(CorsPolicy, policy =>
     {
-        policy.SetIsOriginAllowed(origin => new Uri(origin).Host is "localhost" or "127.0.0.1")
+        // Además de localhost (dev), se permite cualquier subdominio *.vercel.app que empiece
+        // con el nombre del proyecto del frontend (mbos-hub-inven-track...) — Vercel genera un
+        // dominio nuevo por cada deploy de preview (con un hash distinto cada vez) y otro por
+        // rama de git, así que hace falta un patrón en vez de una lista fija de URLs exactas.
+        policy.SetIsOriginAllowed(origin =>
+              {
+                  var host = new Uri(origin).Host;
+                  return host is "localhost" or "127.0.0.1"
+                      || (host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase)
+                          && host.StartsWith("mbos-hub-inven-track", StringComparison.OrdinalIgnoreCase));
+              })
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -126,10 +142,14 @@ if (app.Environment.IsDevelopment())
     app.MapGet("/", () => Results.Redirect("/swagger"));
 }
 
-app.UseCors(LocalDevCorsPolicy);
+app.UseCors(CorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Sin autenticación a propósito: es lo que Render llama para el health check del deploy,
+// antes de que exista ningún token con el que autenticarse.
+app.MapGet("/health", () => Results.Ok("healthy"));
 
 app.MapControllers();
 
