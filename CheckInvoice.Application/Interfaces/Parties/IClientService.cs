@@ -11,4 +11,5 @@ public interface IClientService
     Task<ResponsePost> InsertClient(ClientDto clientDto);
     Task<ResponsePost> UpdateClient(long id, ClientDto clientDto);
     Task<ResponsePost> DeleteClient(long id);
+    Task<ResponseGetObject> GrantPortalAccess(long id);
 }

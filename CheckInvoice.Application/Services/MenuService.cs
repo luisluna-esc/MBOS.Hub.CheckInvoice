@@ -118,6 +118,7 @@ public class MenuService : IMenuService
         var menu = new Menu
         {
             Name = menuDto.Name,
+            TranslationKey = menuDto.TranslationKey,
             Route = menuDto.Route,
             Icon = menuDto.Icon,
             ParentMenuId = menuDto.ParentMenuId,
@@ -184,6 +185,7 @@ public class MenuService : IMenuService
         }
 
         menu.Name = menuDto.Name;
+        menu.TranslationKey = menuDto.TranslationKey;
         menu.Route = menuDto.Route;
         menu.Icon = menuDto.Icon;
         menu.ParentMenuId = menuDto.ParentMenuId;
@@ -240,18 +242,63 @@ public class MenuService : IMenuService
             select rp.PermissionId
         ).Distinct().ToListAsync();
 
-        var menus = await _unitOfWork.Repository<Menu>().Query()
+        var roleIds = await (
+            from ur in _unitOfWork.Repository<AppUserRole>().Query()
+            join r in _unitOfWork.Repository<Role>().Query() on ur.RoleId equals r.RoleId
+            where ur.AppUserId == appUserId && r.IsActive
+            select r.RoleId
+        ).Distinct().ToListAsync();
+
+        // Un menu es visible para un rol solo si existe una fila en menu_role para ese
+        // par (menu, rol). Un menu nuevo sin ninguna fila no lo ve nadie hasta que se
+        // le asignen roles explícitamente.
+        var allowedMenuIdsForMyRoles = await _unitOfWork.Repository<MenuRole>().Query()
+            .Where(mr => roleIds.Contains(mr.RoleId))
+            .Select(mr => mr.MenuId)
+            .Distinct()
+            .ToListAsync();
+
+        var allMenus = await _unitOfWork.Repository<Menu>().Query()
             .Where(m => m.IsActive && (m.PermissionId == null || permissionIds.Contains(m.PermissionId.Value)))
             .OrderBy(m => m.DisplayOrder).ThenBy(m => m.Name)
             .ToListAsync();
+
+        var visibleByRole = allMenus
+            .Where(m => allowedMenuIdsForMyRoles.Contains(m.MenuId))
+            .ToList();
+
+        // Un grupo padre (sin ruta propia) no tiene sentido mostrarlo si ninguno
+        // de sus hijos quedó visible tras el filtro de rol.
+        var visibleChildCountByParent = visibleByRole
+            .Where(m => m.ParentMenuId.HasValue)
+            .GroupBy(m => m.ParentMenuId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var menus = visibleByRole
+            .Where(m => m.Route != null || visibleChildCountByParent.GetValueOrDefault(m.MenuId) > 0)
+            .ToList();
+
+        var menuPermissionIds = menus
+            .Where(m => m.PermissionId.HasValue)
+            .Select(m => m.PermissionId!.Value)
+            .Distinct()
+            .ToList();
+
+        var permissionCodesById = await _unitOfWork.Repository<Permission>().Query()
+            .Where(p => menuPermissionIds.Contains(p.PermissionId))
+            .ToDictionaryAsync(p => p.PermissionId, p => p.Code);
 
         var itemsById = menus.ToDictionary(m => m.MenuId, m => new MenuTreeItemDto
         {
             MenuId = m.MenuId,
             Name = m.Name,
+            TranslationKey = m.TranslationKey,
             Route = m.Route,
             Icon = m.Icon,
-            DisplayOrder = m.DisplayOrder
+            DisplayOrder = m.DisplayOrder,
+            PermissionCode = m.PermissionId.HasValue && permissionCodesById.TryGetValue(m.PermissionId.Value, out var code)
+                ? code
+                : null
         });
 
         var roots = new List<MenuTreeItemDto>();
@@ -282,6 +329,7 @@ public class MenuService : IMenuService
     {
         MenuId = menu.MenuId,
         Name = menu.Name,
+        TranslationKey = menu.TranslationKey,
         Route = menu.Route,
         Icon = menu.Icon,
         ParentMenuId = menu.ParentMenuId,

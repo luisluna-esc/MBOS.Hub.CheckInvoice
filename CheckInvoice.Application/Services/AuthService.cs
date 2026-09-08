@@ -50,13 +50,13 @@ public class AuthService : IAuthService
             };
         }
 
-        var (roles, permissions) = await GetRolesAndPermissions(appUser.AppUserId);
+        var (roles, permissions, rolePermissions) = await GetRolesAndPermissions(appUser.AppUserId);
 
         var trackedAppUser = await _unitOfWork.Repository<AppUser>().GetByIdAsync(appUser.AppUserId);
         trackedAppUser!.LastLogin = DateTime.UtcNow;
         _unitOfWork.Repository<AppUser>().Update(trackedAppUser);
 
-        var authResponse = await IssueTokens(appUser, roles, permissions, ipAddress);
+        var authResponse = await IssueTokens(appUser, roles, permissions, rolePermissions, ipAddress);
 
         return new ResponseGetObject
         {
@@ -97,8 +97,8 @@ public class AuthService : IAuthService
         trackedToken!.IsRevoked = true;
         repository.Update(trackedToken);
 
-        var (roles, permissions) = await GetRolesAndPermissions(appUser.AppUserId);
-        var authResponse = await IssueTokens(appUser, roles, permissions, ipAddress);
+        var (roles, permissions, rolePermissions) = await GetRolesAndPermissions(appUser.AppUserId);
+        var authResponse = await IssueTokens(appUser, roles, permissions, rolePermissions, ipAddress);
 
         return new ResponseGetObject
         {
@@ -137,7 +137,7 @@ public class AuthService : IAuthService
         };
     }
 
-    private async Task<(List<string> Roles, List<string> Permissions)> GetRolesAndPermissions(long appUserId)
+    private async Task<(List<string> Roles, List<string> Permissions, Dictionary<string, List<string>> RolePermissions)> GetRolesAndPermissions(long appUserId)
     {
         var roles = await (
             from ur in _unitOfWork.Repository<AppUserRole>().Query()
@@ -154,10 +154,33 @@ public class AuthService : IAuthService
             select p.Code
         ).Distinct().ToListAsync();
 
-        return (roles, permissions);
+        var rolePermissionRows = await (
+            from ur in _unitOfWork.Repository<AppUserRole>().Query()
+            join r in _unitOfWork.Repository<Role>().Query() on ur.RoleId equals r.RoleId
+            join rp in _unitOfWork.Repository<RolePermission>().Query() on r.RoleId equals rp.RoleId
+            join p in _unitOfWork.Repository<Permission>().Query() on rp.PermissionId equals p.PermissionId
+            where ur.AppUserId == appUserId && r.IsActive && p.IsActive
+            select new { RoleName = r.Name, PermissionCode = p.Code }
+        ).Distinct().ToListAsync();
+
+        // Cada rol activo del usuario aparece como llave, aunque no tenga permisos asignados (lista vacía).
+        var rolePermissions = roles.ToDictionary(
+            roleName => roleName,
+            roleName => rolePermissionRows
+                .Where(row => row.RoleName == roleName)
+                .Select(row => row.PermissionCode)
+                .ToList()
+        );
+
+        return (roles, permissions, rolePermissions);
     }
 
-    private async Task<AuthResponseDto> IssueTokens(AppUser appUser, List<string> roles, List<string> permissions, string? ipAddress)
+    private async Task<AuthResponseDto> IssueTokens(
+        AppUser appUser,
+        List<string> roles,
+        List<string> permissions,
+        Dictionary<string, List<string>> rolePermissions,
+        string? ipAddress)
     {
         var (accessToken, accessTokenExpiresAt) = _jwtTokenGenerator.GenerateAccessToken(appUser, roles, permissions);
         var refreshTokenValue = _jwtTokenGenerator.GenerateRefreshToken();
@@ -186,7 +209,8 @@ public class AuthService : IAuthService
             RefreshToken = refreshTokenValue,
             RefreshTokenExpiresAt = refreshTokenExpiresAt,
             Roles = roles,
-            Permissions = permissions
+            Permissions = permissions,
+            RolePermissions = rolePermissions
         };
     }
 }

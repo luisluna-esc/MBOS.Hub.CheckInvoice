@@ -19,5 +19,7 @@ public class ChurchTypeConfiguration : IEntityTypeConfiguration<ChurchType>
               .IsRequired()
               .HasMaxLength(50)
               .HasColumnName("name");
+
+        entity.HasIndex(e => e.Name).IsUnique();
     }
 }

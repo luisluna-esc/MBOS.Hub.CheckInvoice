@@ -4,6 +4,7 @@ using CheckInvoice.Application.Interfaces.Movements;
 using CheckInvoice.core.Configuration;
 using CheckInvoice.core.Entities.Catalogs;
 using CheckInvoice.core.Entities.Movements;
+using CheckInvoice.core.Entities.Parties;
 using CheckInvoice.core.Entities.Products;
 using CheckInvoice.core.Entities.ResponseApi.Details;
 using CheckInvoice.core.Entities.ResponseApi.DisplayFormat;
@@ -12,6 +13,7 @@ using CheckInvoice.core.Entities.Warehouses;
 using CheckInvoice.core.Interfaces;
 using CheckInvoice.core.QueryFilters.Movements;
 using CheckInvoice.core.QueryFilters.Pagination;
+using CheckInvoice.Application.Interfaces.Security;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,12 +24,18 @@ public class TransferService : ITransferService
     private readonly IUnitOfWork _unitOfWork;
     private readonly PaginationOptions _paginationOptions;
     private readonly IValidator<TransferRequestDto> _validator;
+    private readonly ICurrentUserService _currentUserService;
 
-    public TransferService(IUnitOfWork unitOfWork, PaginationOptions paginationOptions, IValidator<TransferRequestDto> validator)
+    public TransferService(
+        IUnitOfWork unitOfWork,
+        PaginationOptions paginationOptions,
+        IValidator<TransferRequestDto> validator,
+        ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
         _paginationOptions = paginationOptions;
         _validator = validator;
+        _currentUserService = currentUserService;
     }
 
     public async Task<ResponseGetObject> GetAllTransfers(PaginationQueryFilter paginationQueryFilter, TransferQueryFilter transferQueryFilter)
@@ -50,6 +58,37 @@ public class TransferService : ITransferService
         if (transferQueryFilter.DestinationWarehouseId.HasValue)
         {
             query = query.Where(t => t.DestinationWarehouseId == transferQueryFilter.DestinationWarehouseId.Value);
+        }
+
+        if (transferQueryFilter.SenderUserId.HasValue)
+        {
+            query = query.Where(t => t.SenderUserId == transferQueryFilter.SenderUserId.Value);
+        }
+
+        if (transferQueryFilter.ReceiverUserId.HasValue)
+        {
+            query = query.Where(t => t.ReceiverUserId == transferQueryFilter.ReceiverUserId.Value);
+        }
+
+        if (transferQueryFilter.ReceiverClientId.HasValue)
+        {
+            query = query.Where(t => t.ReceiverClientId == transferQueryFilter.ReceiverClientId.Value);
+        }
+
+        if (transferQueryFilter.DateFrom.HasValue)
+        {
+            query = query.Where(t => t.TransferDate >= transferQueryFilter.DateFrom.Value.Date);
+        }
+
+        if (transferQueryFilter.DateTo.HasValue)
+        {
+            var exclusiveEnd = transferQueryFilter.DateTo.Value.Date.AddDays(1);
+            query = query.Where(t => t.TransferDate < exclusiveEnd);
+        }
+
+        if (transferQueryFilter.IsApproved.HasValue)
+        {
+            query = query.Where(t => t.IsApproved == transferQueryFilter.IsApproved.Value);
         }
 
         var totalRecords = await query.CountAsync();
@@ -114,7 +153,8 @@ public class TransferService : ITransferService
             .Select(e => new Message { Type = MessageType.Error, Description = e.ErrorMessage })
             .ToList();
 
-        if (!await _unitOfWork.Repository<Warehouse>().Query().AnyAsync(w => w.WarehouseId == transferRequestDto.SourceWarehouseId))
+        if (transferRequestDto.SourceWarehouseId.HasValue &&
+            !await _unitOfWork.Repository<Warehouse>().Query().AnyAsync(w => w.WarehouseId == transferRequestDto.SourceWarehouseId.Value))
         {
             errors.Add(new Message { Type = MessageType.Error, Description = "SourceWarehouseId does not reference an existing warehouse." });
         }
@@ -134,6 +174,12 @@ public class TransferService : ITransferService
             !await _unitOfWork.Repository<AppUser>().Query().AnyAsync(u => u.AppUserId == transferRequestDto.ReceiverUserId.Value))
         {
             errors.Add(new Message { Type = MessageType.Error, Description = "ReceiverUserId does not reference an existing user." });
+        }
+
+        if (transferRequestDto.ReceiverClientId.HasValue &&
+            !await _unitOfWork.Repository<Client>().Query().AnyAsync(c => c.ClientId == transferRequestDto.ReceiverClientId.Value))
+        {
+            errors.Add(new Message { Type = MessageType.Error, Description = "ReceiverClientId does not reference an existing client." });
         }
 
         foreach (var line in transferRequestDto.Details)
@@ -159,25 +205,29 @@ public class TransferService : ITransferService
             .ToDictionary(g => g.Key, g => g.Sum(d => d.Quantity));
 
         var sourceStockByProduct = new Dictionary<long, Stock>();
-        foreach (var productId in requestedByProduct.Keys)
+        if (transferRequestDto.SourceWarehouseId.HasValue)
         {
-            var stock = await _unitOfWork.Repository<Stock>().Query()
-                .FirstOrDefaultAsync(s => s.WarehouseId == transferRequestDto.SourceWarehouseId && s.ProductId == productId);
-
-            var available = stock?.Quantity ?? 0;
-            var requested = requestedByProduct[productId];
-
-            if (available < requested)
+            var sourceWarehouseId = transferRequestDto.SourceWarehouseId.Value;
+            foreach (var productId in requestedByProduct.Keys)
             {
-                errors.Add(new Message
-                {
-                    Type = MessageType.Error,
-                    Description = $"Insufficient stock for ProductId {productId}: {available} available, {requested} requested."
-                });
-                continue;
-            }
+                var stock = await _unitOfWork.Repository<Stock>().Query()
+                    .FirstOrDefaultAsync(s => s.WarehouseId == sourceWarehouseId && s.ProductId == productId);
 
-            sourceStockByProduct[productId] = stock!;
+                var available = stock?.Quantity ?? 0;
+                var requested = requestedByProduct[productId];
+
+                if (available < requested)
+                {
+                    errors.Add(new Message
+                    {
+                        Type = MessageType.Error,
+                        Description = $"Insufficient stock for ProductId {productId}: {available} available, {requested} requested."
+                    });
+                    continue;
+                }
+
+                sourceStockByProduct[productId] = stock!;
+            }
         }
 
         if (errors.Count > 0)
@@ -190,14 +240,21 @@ public class TransferService : ITransferService
             };
         }
 
+        // Sin almacén origen (llegó de un tercero externo, fuera de este sistema) la recepción
+        // queda pendiente de revisión: se registra el detalle pero el stock no se toca todavía,
+        // para no mezclar cantidades sin verificar con el stock oficial disponible para Salidas.
+        var isExternalReceipt = !transferRequestDto.SourceWarehouseId.HasValue;
+
         var transfer = new Transfer
         {
             SourceWarehouseId = transferRequestDto.SourceWarehouseId,
             DestinationWarehouseId = transferRequestDto.DestinationWarehouseId,
             SenderUserId = transferRequestDto.SenderUserId,
             ReceiverUserId = transferRequestDto.ReceiverUserId,
+            ReceiverClientId = transferRequestDto.ReceiverClientId,
             TransferDate = DateTime.UtcNow,
-            Notes = transferRequestDto.Notes
+            Notes = transferRequestDto.Notes,
+            IsApproved = !isExternalReceipt
         };
 
         await _unitOfWork.Repository<Transfer>().AddAsync(transfer);
@@ -208,8 +265,8 @@ public class TransferService : ITransferService
 
         foreach (var line in transferRequestDto.Details)
         {
-            var sourceStock = sourceStockByProduct[line.ProductId];
-            var movedCost = sourceStock.AverageCost;
+            var sourceStock = sourceStockByProduct.GetValueOrDefault(line.ProductId);
+            var movedCost = sourceStock?.AverageCost ?? line.UnitPrice ?? 0;
 
             await _unitOfWork.Repository<TransferDetail>().AddAsync(new TransferDetail
             {
@@ -220,9 +277,15 @@ public class TransferService : ITransferService
                 TotalSalePrice = line.UnitPrice.HasValue ? line.Quantity * line.UnitPrice.Value : null
             });
 
-            sourceStock.Quantity -= line.Quantity;
+            if (sourceStock is not null)
+            {
+                sourceStock.Quantity -= line.Quantity;
+            }
 
-            await IncreaseStock(destinationStockCache, transferRequestDto.DestinationWarehouseId, line.ProductId, line.Quantity, movedCost);
+            if (!isExternalReceipt)
+            {
+                await IncreaseStock(destinationStockCache, transferRequestDto.DestinationWarehouseId, line.ProductId, line.Quantity, movedCost);
+            }
         }
 
         foreach (var stock in sourceStockByProduct.Values)
@@ -237,6 +300,45 @@ public class TransferService : ITransferService
             Id = transfer.TransferId,
             Messages = [new Message { Type = MessageType.Success, Description = "Transfer created successfully." }],
             StatusCode = HttpStatusCode.Created
+        };
+    }
+
+    public async Task<ResponsePost> ApproveTransfer(long transferId)
+    {
+        var transfer = await _unitOfWork.Repository<Transfer>().GetByIdAsync(transferId);
+        if (transfer is null)
+        {
+            return new ResponsePost
+            {
+                Id = transferId,
+                Messages = [new Message { Type = MessageType.Error, Description = "Transfer not found." }],
+                StatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        if (transfer.IsApproved)
+        {
+            return new ResponsePost
+            {
+                Id = transferId,
+                Messages = [new Message { Type = MessageType.Error, Description = "Transfer is already approved." }],
+                StatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
+        // Aprobar es solo una revisión/registro: nunca toca stock ni costo, en ningún campo.
+        transfer.IsApproved = true;
+        transfer.ApprovedById = _currentUserService.AppUserId;
+        transfer.ApprovedAt = DateTime.UtcNow;
+        _unitOfWork.Repository<Transfer>().Update(transfer);
+
+        await _unitOfWork.SaveChangesAsync();
+
+        return new ResponsePost
+        {
+            Id = transfer.TransferId,
+            Messages = [new Message { Type = MessageType.Success, Description = "Transfer approved successfully." }],
+            StatusCode = HttpStatusCode.OK
         };
     }
 
@@ -285,7 +387,11 @@ public class TransferService : ITransferService
         DestinationWarehouseId = transfer.DestinationWarehouseId,
         SenderUserId = transfer.SenderUserId,
         ReceiverUserId = transfer.ReceiverUserId,
+        ReceiverClientId = transfer.ReceiverClientId,
         TransferDate = transfer.TransferDate,
-        Notes = transfer.Notes
+        Notes = transfer.Notes,
+        IsApproved = transfer.IsApproved,
+        ApprovedById = transfer.ApprovedById,
+        ApprovedAt = transfer.ApprovedAt
     };
 }

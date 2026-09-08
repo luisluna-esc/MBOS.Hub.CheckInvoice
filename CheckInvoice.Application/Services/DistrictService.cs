@@ -113,7 +113,6 @@ public class DistrictService : IDistrictService
 
         var district = new District
         {
-            Code = districtDto.Code,
             DistrictName = districtDto.DistrictName,
             MissionId = districtDto.MissionId,
             ProvinceId = districtDto.ProvinceId,
@@ -122,7 +121,13 @@ public class DistrictService : IDistrictService
             IsActive = districtDto.IsActive
         };
 
-        await _unitOfWork.Repository<District>().AddAsync(district);
+        var repository = _unitOfWork.Repository<District>();
+        await repository.AddAsync(district);
+        await _unitOfWork.SaveChangesAsync();
+
+        // El código se genera a partir del DistrictId asignado por la base de datos, no lo envía el cliente.
+        district.Code = district.DistrictId.ToString("D5");
+        repository.Update(district);
         await _unitOfWork.SaveChangesAsync();
 
         return new ResponsePost
@@ -165,7 +170,7 @@ public class DistrictService : IDistrictService
             };
         }
 
-        district.Code = districtDto.Code;
+        // Code no se toca aquí: se genera una sola vez al crear y es inmutable.
         district.DistrictName = districtDto.DistrictName;
         district.MissionId = districtDto.MissionId;
         district.ProvinceId = districtDto.ProvinceId;

@@ -49,4 +49,12 @@ public class ClientsController : ControllerBase
         var result = await _clientService.DeleteClient(id);
         return StatusCode((int)result.StatusCode, result);
     }
+
+    [Authorize(Policy = "client.manage")]
+    [HttpPost("{id}/grant-portal-access")]
+    public async Task<IActionResult> GrantPortalAccess(long id)
+    {
+        var result = await _clientService.GrantPortalAccess(id);
+        return StatusCode((int)result.StatusCode, result);
+    }
 }

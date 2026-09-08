@@ -11,6 +11,9 @@ public class MenuValidator : AbstractValidator<MenuDto>
             .NotEmpty().WithMessage("Name is required.")
             .MaximumLength(100).WithMessage("Name must not exceed 100 characters.");
 
+        RuleFor(x => x.TranslationKey)
+            .MaximumLength(100).WithMessage("TranslationKey must not exceed 100 characters.");
+
         RuleFor(x => x.Route)
             .MaximumLength(150).WithMessage("Route must not exceed 150 characters.");
 

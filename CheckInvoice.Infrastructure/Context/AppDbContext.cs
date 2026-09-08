@@ -1,6 +1,7 @@
 using CheckInvoice.core.Entities.Audit;
 using CheckInvoice.core.Entities.Catalogs;
 using CheckInvoice.core.Entities.Finance;
+using CheckInvoice.core.Entities.Governance;
 using CheckInvoice.core.Entities.Movements;
 using CheckInvoice.core.Entities.Organization;
 using CheckInvoice.core.Entities.Parties;
@@ -57,11 +58,14 @@ public class AppDbContext : DbContext
     public DbSet<TransferDetail> TransferDetails => Set<TransferDetail>();
     public DbSet<InventoryCount> InventoryCounts => Set<InventoryCount>();
     public DbSet<InventoryCountDetail> InventoryCountDetails => Set<InventoryCountDetail>();
-    public DbSet<Deposit> Deposits => Set<Deposit>();
     public DbSet<Discount> Discounts => Set<Discount>();
     public DbSet<AccountReceivable> AccountReceivables => Set<AccountReceivable>();
     public DbSet<Installment> Installments => Set<Installment>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<ChangeRequest> ChangeRequests => Set<ChangeRequest>();
+    public DbSet<VoidReason> VoidReasons => Set<VoidReason>();
+    public DbSet<IssueVoidRequest> IssueVoidRequests => Set<IssueVoidRequest>();
+    public DbSet<ReceiptVoidRequest> ReceiptVoidRequests => Set<ReceiptVoidRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

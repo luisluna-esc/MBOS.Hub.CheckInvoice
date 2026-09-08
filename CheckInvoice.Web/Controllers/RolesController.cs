@@ -13,11 +13,13 @@ public class RolesController : ControllerBase
 {
     private readonly IRoleService _roleService;
     private readonly IRolePermissionService _rolePermissionService;
+    private readonly IRoleMenuService _roleMenuService;
 
-    public RolesController(IRoleService roleService, IRolePermissionService rolePermissionService)
+    public RolesController(IRoleService roleService, IRolePermissionService rolePermissionService, IRoleMenuService roleMenuService)
     {
         _roleService = roleService;
         _rolePermissionService = rolePermissionService;
+        _roleMenuService = roleMenuService;
     }
 
     [Authorize(Policy = "role.view")]
@@ -73,6 +75,30 @@ public class RolesController : ControllerBase
     public async Task<IActionResult> RemovePermission(long id, long permissionId)
     {
         var result = await _rolePermissionService.RemovePermission(id, permissionId);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [Authorize(Policy = "role.view")]
+    [HttpGet("{id}/menus")]
+    public async Task<IActionResult> GetMenus(long id)
+    {
+        var result = await _roleMenuService.GetMenusByRole(id);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [Authorize(Policy = "role.manage")]
+    [HttpPost("{id}/menus/{menuId}")]
+    public async Task<IActionResult> AssignMenu(long id, long menuId)
+    {
+        var result = await _roleMenuService.AssignMenu(id, menuId);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [Authorize(Policy = "role.manage")]
+    [HttpDelete("{id}/menus/{menuId}")]
+    public async Task<IActionResult> RemoveMenu(long id, long menuId)
+    {
+        var result = await _roleMenuService.RemoveMenu(id, menuId);
         return StatusCode((int)result.StatusCode, result);
     }
 }

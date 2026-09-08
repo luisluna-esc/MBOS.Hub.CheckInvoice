@@ -11,4 +11,5 @@ public class AuthResponseDto
     public DateTime RefreshTokenExpiresAt { get; set; }
     public IEnumerable<string> Roles { get; set; } = [];
     public IEnumerable<string> Permissions { get; set; } = [];
+    public Dictionary<string, List<string>> RolePermissions { get; set; } = [];
 }

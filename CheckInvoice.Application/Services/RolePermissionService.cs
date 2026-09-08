@@ -93,6 +93,27 @@ public class RolePermissionService : IRolePermissionService
             };
         }
 
+        if (permission.Code is "trabajo" or "visita")
+        {
+            var opposingCode = permission.Code == "trabajo" ? "visita" : "trabajo";
+            var hasOpposing = await (
+                from rp in _unitOfWork.Repository<RolePermission>().Query()
+                join p in _unitOfWork.Repository<Permission>().Query() on rp.PermissionId equals p.PermissionId
+                where rp.RoleId == roleId && p.Code == opposingCode
+                select rp
+            ).AnyAsync();
+
+            if (hasOpposing)
+            {
+                return new ResponsePost
+                {
+                    Id = 0,
+                    Messages = [new Message { Type = MessageType.Error, Description = "A role cannot have both 'trabajo' and 'visita' at the same time. Remove the other one first." }],
+                    StatusCode = HttpStatusCode.Conflict
+                };
+            }
+        }
+
         var rolePermission = new RolePermission
         {
             RoleId = roleId,
@@ -113,6 +134,17 @@ public class RolePermissionService : IRolePermissionService
 
     public async Task<ResponsePost> RemovePermission(long roleId, long permissionId)
     {
+        var role = await _unitOfWork.Repository<Role>().GetByIdAsync(roleId);
+        if (role?.Name == "M-BOS")
+        {
+            return new ResponsePost
+            {
+                Id = 0,
+                Messages = [new Message { Type = MessageType.Error, Description = "The M-BOS role's permissions cannot be removed by anyone." }],
+                StatusCode = HttpStatusCode.Forbidden
+            };
+        }
+
         var repository = _unitOfWork.Repository<RolePermission>();
         var rolePermission = await repository.Query()
             .FirstOrDefaultAsync(rp => rp.RoleId == roleId && rp.PermissionId == permissionId);

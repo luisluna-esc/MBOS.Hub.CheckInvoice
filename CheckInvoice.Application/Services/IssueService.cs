@@ -1,15 +1,18 @@
 using System.Net;
 using CheckInvoice.Application.Dtos.Movements;
+using CheckInvoice.Application.Dtos.StoredProcedures;
 using CheckInvoice.Application.Interfaces.Movements;
 using CheckInvoice.Application.Interfaces.Security;
 using CheckInvoice.core.Configuration;
 using CheckInvoice.core.Entities.Catalogs;
 using CheckInvoice.core.Entities.Finance;
+using CheckInvoice.core.Entities.Governance;
 using CheckInvoice.core.Entities.Movements;
 using CheckInvoice.core.Entities.Parties;
 using CheckInvoice.core.Entities.Products;
 using CheckInvoice.core.Entities.ResponseApi.Details;
 using CheckInvoice.core.Entities.ResponseApi.DisplayFormat;
+using CheckInvoice.core.Entities.Security;
 using CheckInvoice.core.Entities.Warehouses;
 using CheckInvoice.core.Interfaces;
 using CheckInvoice.core.QueryFilters.Movements;
@@ -38,46 +41,68 @@ public class IssueService : IIssueService
         _currentUserService = currentUserService;
     }
 
+    // EF Core mapea las columnas del resultado de FromSql/SqlQueryRaw por el nombre exacto
+    // de la propiedad C# (ej. "ClientId"), no por el nombre de columna en snake_case que
+    // devuelve la función SQL (ej. client_id) — de ahí los alias explícitos.
+    private const string GetIssuesSql = """
+        SELECT
+            issue_id AS "IssueId",
+            issue_type_id AS "IssueTypeId",
+            warehouse_id AS "WarehouseId",
+            warehouse_period_id AS "WarehousePeriodId",
+            client_id AS "ClientId",
+            complement AS "Complement",
+            issue_date AS "IssueDate",
+            print_type_id AS "PrintTypeId",
+            description AS "Description",
+            created_at AS "CreatedAt",
+            created_by_id AS "CreatedById",
+            created_by_full_name AS "CreatedByFullName",
+            has_pending_change_request AS "HasPendingChangeRequest",
+            total AS "Total",
+            is_voided AS "IsVoided",
+            has_pending_void_request AS "HasPendingVoidRequest",
+            void_reason_name AS "VoidReasonName",
+            void_detail AS "VoidDetail",
+            total_records AS "TotalRecords"
+        FROM sp_get_issues({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::int, {5}::int)
+        """;
+
     public async Task<ResponseGetObject> GetAllIssues(PaginationQueryFilter paginationQueryFilter, IssueQueryFilter issueQueryFilter)
     {
         var pageSize = paginationQueryFilter.PageSize > 0 ? paginationQueryFilter.PageSize : _paginationOptions.InitialPageSize;
         var pageNumber = paginationQueryFilter.PageNumber > 0 ? paginationQueryFilter.PageNumber : _paginationOptions.InitialPageNumber;
 
-        var query = _unitOfWork.Repository<Issue>().Query();
+        // Piloto de rendimiento: antes esto hacía 8 consultas separadas (página, conteo,
+        // nombre del creador, cambios pendientes, total por salida, anulaciones pendientes,
+        // anulaciones relevantes, motivo de anulación). Ahora es una sola consulta con joins
+        // via sp_get_issues (Scrips/storedProcedures.sql).
+        var rows = await _unitOfWork.SqlQueryAsync<IssueGetAllRow>(
+            GetIssuesSql,
+            (object?)issueQueryFilter.IssueId ?? DBNull.Value,
+            (object?)issueQueryFilter.ClientId ?? DBNull.Value,
+            (object?)issueQueryFilter.WarehouseId ?? DBNull.Value,
+            (object?)issueQueryFilter.IssueTypeId ?? DBNull.Value,
+            pageNumber,
+            pageSize);
 
-        if (issueQueryFilter.IssueId.HasValue)
+        var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
+
+        // SqlQueryRaw no pasa por el ValueConverter global de AppDbContext que marca todo
+        // DateTime como Utc al leer (ver AppDbContext.OnModelCreating) — sin esto, IssueDate/
+        // CreatedAt llegan con Kind=Unspecified y el JSON pierde la "Z", corriendo la fecha
+        // mostrada en el frontend según la zona horaria del navegador.
+        foreach (var row in rows)
         {
-            query = query.Where(i => i.IssueId == issueQueryFilter.IssueId.Value);
+            row.IssueDate = DateTime.SpecifyKind(row.IssueDate, DateTimeKind.Utc);
+            row.CreatedAt = DateTime.SpecifyKind(row.CreatedAt, DateTimeKind.Utc);
         }
-
-        if (issueQueryFilter.ClientId.HasValue)
-        {
-            query = query.Where(i => i.ClientId == issueQueryFilter.ClientId.Value);
-        }
-
-        if (issueQueryFilter.WarehouseId.HasValue)
-        {
-            query = query.Where(i => i.WarehouseId == issueQueryFilter.WarehouseId.Value);
-        }
-
-        if (issueQueryFilter.IssueTypeId.HasValue)
-        {
-            query = query.Where(i => i.IssueTypeId == issueQueryFilter.IssueTypeId.Value);
-        }
-
-        var totalRecords = await query.CountAsync();
-
-        var issues = await query
-            .OrderByDescending(i => i.IssueDate)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
 
         return new ResponseGetObject
         {
             Data = new PagedResult<IssueDto>
             {
-                Items = issues.Select(ToDto),
+                Items = rows,
                 TotalRecords = totalRecords,
                 PageNumber = pageNumber,
                 PageSize = pageSize
@@ -226,9 +251,11 @@ public class IssueService : IIssueService
             WarehousePeriodId = issueRequestDto.WarehousePeriodId,
             ClientId = issueRequestDto.ClientId,
             Complement = issueRequestDto.Complement,
-            IssueDate = DateTime.UtcNow,
+            IssueDate = issueRequestDto.IssueDate ?? DateTime.UtcNow,
             PrintTypeId = issueRequestDto.PrintTypeId,
-            Description = issueRequestDto.Description
+            Description = issueRequestDto.Description,
+            CreatedAt = DateTime.UtcNow,
+            CreatedById = _currentUserService.AppUserId
         };
 
         await _unitOfWork.Repository<Issue>().AddAsync(issue);
@@ -275,6 +302,7 @@ public class IssueService : IIssueService
                 TotalAmount = totalAmount,
                 OutstandingBalance = totalAmount,
                 PaymentType = issueRequestDto.PaymentType!,
+                PaymentDetail = issueRequestDto.PaymentDetail,
                 DueDate = issueRequestDto.DueDate,
                 Status = "pending",
                 CreatedAt = DateTime.UtcNow,
@@ -293,16 +321,4 @@ public class IssueService : IIssueService
         };
     }
 
-    private static IssueDto ToDto(Issue issue) => new()
-    {
-        IssueId = issue.IssueId,
-        IssueTypeId = issue.IssueTypeId,
-        WarehouseId = issue.WarehouseId,
-        WarehousePeriodId = issue.WarehousePeriodId,
-        ClientId = issue.ClientId,
-        Complement = issue.Complement,
-        IssueDate = issue.IssueDate,
-        PrintTypeId = issue.PrintTypeId,
-        Description = issue.Description
-    };
 }

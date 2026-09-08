@@ -7,4 +7,5 @@ public class ProductQueryFilter
     public long? DepartmentId { get; set; }
     public long? SubDepartmentId { get; set; }
     public bool? IsActive { get; set; }
+    public long? WarehouseId { get; set; }
 }

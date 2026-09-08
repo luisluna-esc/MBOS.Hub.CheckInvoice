@@ -47,5 +47,18 @@ public class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
         entity.Property(e => e.InvoiceTotal)
               .HasColumnName("invoice_total")
               .HasColumnType("numeric(12,2)");
+
+        entity.Property(e => e.CreatedAt)
+              .IsRequired()
+              .HasColumnName("created_at")
+              .HasColumnType("timestamp without time zone");
+
+        entity.Property(e => e.CreatedById)
+              .HasColumnName("created_by");
+
+        entity.Property(e => e.IsVoided)
+              .IsRequired()
+              .HasColumnName("is_voided")
+              .HasDefaultValue(false);
     }
 }

@@ -573,6 +573,34 @@ CREATE TABLE pago (
 CREATE INDEX idx_pago_cxc ON pago(cuenta_por_cobrar_id);
 
 -- =====================================================================
+-- NIVEL 10: solicitud_cambio (flujo de aprobación de edición/eliminación
+-- para las cabeceras de movimientos inmutables: entrada, salida, transferencia)
+-- =====================================================================
+
+CREATE TABLE solicitud_cambio (
+    solicitud_cambio_id BIGSERIAL PRIMARY KEY,
+    nombre_tabla VARCHAR(50) NOT NULL,
+    registro_id BIGINT NOT NULL,
+    accion VARCHAR(20) NOT NULL,
+    datos_actuales JSONB,
+    datos_propuestos JSONB,
+    motivo VARCHAR(255) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente',
+    solicitado_por BIGINT NOT NULL,
+    solicitado_en TIMESTAMP NOT NULL DEFAULT NOW(),
+    revisado_por BIGINT,
+    revisado_en TIMESTAMP,
+    notas_revision VARCHAR(255),
+    CONSTRAINT fk_solicitud_cambio_solicitado_por FOREIGN KEY (solicitado_por) REFERENCES usuario(usuario_id),
+    CONSTRAINT fk_solicitud_cambio_revisado_por FOREIGN KEY (revisado_por) REFERENCES usuario(usuario_id),
+    CONSTRAINT chk_solicitud_cambio_tabla CHECK (nombre_tabla IN ('entrada', 'salida', 'transferencia')),
+    CONSTRAINT chk_solicitud_cambio_accion CHECK (accion IN ('editar', 'eliminar'))
+);
+
+CREATE INDEX idx_solicitud_cambio_estado ON solicitud_cambio(estado);
+CREATE INDEX idx_solicitud_cambio_tabla_registro ON solicitud_cambio(nombre_tabla, registro_id);
+
+-- =====================================================================
 -- DATOS SEMILLA (seed)
 -- =====================================================================
 

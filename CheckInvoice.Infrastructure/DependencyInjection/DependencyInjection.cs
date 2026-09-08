@@ -1,5 +1,6 @@
 using CheckInvoice.Application.Dtos.Catalogs;
 using CheckInvoice.Application.Dtos.Finance;
+using CheckInvoice.Application.Dtos.Governance;
 using CheckInvoice.Application.Dtos.Movements;
 using CheckInvoice.Application.Dtos.Organization;
 using CheckInvoice.Application.Dtos.Parties;
@@ -8,16 +9,19 @@ using CheckInvoice.Application.Dtos.Security;
 using CheckInvoice.Application.Interfaces.Audit;
 using CheckInvoice.Application.Interfaces.Catalogs;
 using CheckInvoice.Application.Interfaces.Finance;
+using CheckInvoice.Application.Interfaces.Governance;
 using CheckInvoice.Application.Interfaces.Movements;
 using CheckInvoice.Application.Interfaces.Organization;
 using CheckInvoice.Application.Interfaces.Parties;
 using CheckInvoice.Application.Interfaces.Portal;
 using CheckInvoice.Application.Interfaces.Products;
+using CheckInvoice.Application.Interfaces.Reports;
 using CheckInvoice.Application.Interfaces.Security;
 using CheckInvoice.Application.Interfaces.Warehouses;
 using CheckInvoice.Application.Services;
 using CheckInvoice.Application.Validators.Catalogs;
 using CheckInvoice.Application.Validators.Finance;
+using CheckInvoice.Application.Validators.Governance;
 using CheckInvoice.Application.Validators.Movements;
 using CheckInvoice.Application.Validators.Organization;
 using CheckInvoice.Application.Validators.Parties;
@@ -84,6 +88,7 @@ public static class DependencyInjection
 
         services.AddScoped<IMenuService, MenuService>();
         services.AddScoped<IValidator<MenuDto>, MenuValidator>();
+        services.AddScoped<IRoleMenuService, RoleMenuService>();
 
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IAuthService, AuthService>();
@@ -96,6 +101,11 @@ public static class DependencyInjection
 
         services.AddScoped<IDocumentTypeService, DocumentTypeService>();
         services.AddScoped<IValidator<DocumentTypeDto>, DocumentTypeValidator>();
+
+        services.AddScoped<ISpecialCaseService, SpecialCaseService>();
+        services.AddScoped<IValidator<SpecialCaseDto>, SpecialCaseValidator>();
+
+        services.AddScoped<IVoidReasonService, VoidReasonService>();
 
         services.AddScoped<IChurchTypeService, ChurchTypeService>();
         services.AddScoped<IValidator<ChurchTypeDto>, ChurchTypeValidator>();
@@ -157,20 +167,25 @@ public static class DependencyInjection
         services.AddScoped<IIssueService, IssueService>();
         services.AddScoped<IValidator<IssueRequestDto>, IssueRequestValidator>();
 
+        services.AddScoped<IIssueVoidRequestService, IssueVoidRequestService>();
+        services.AddScoped<IValidator<IssueVoidRequestCreateDto>, IssueVoidRequestCreateValidator>();
+
+        services.AddScoped<IReceiptVoidRequestService, ReceiptVoidRequestService>();
+        services.AddScoped<IValidator<ReceiptVoidRequestCreateDto>, ReceiptVoidRequestCreateValidator>();
+
         services.AddScoped<ITransferService, TransferService>();
         services.AddScoped<IValidator<TransferRequestDto>, TransferRequestValidator>();
 
         services.AddScoped<IInventoryCountService, InventoryCountService>();
         services.AddScoped<IValidator<InventoryCountRequestDto>, InventoryCountRequestValidator>();
 
-        services.AddScoped<IDepositService, DepositService>();
-        services.AddScoped<IValidator<DepositDto>, DepositValidator>();
-
         services.AddScoped<IDiscountService, DiscountService>();
         services.AddScoped<IValidator<DiscountDto>, DiscountValidator>();
 
         services.AddScoped<IAccountReceivableService, AccountReceivableService>();
         services.AddScoped<IValidator<AccountReceivableDto>, AccountReceivableValidator>();
+
+        services.AddScoped<IReportService, ReportService>();
 
         services.AddScoped<IInstallmentService, InstallmentService>();
         services.AddScoped<IValidator<InstallmentDto>, InstallmentValidator>();
@@ -179,6 +194,9 @@ public static class DependencyInjection
         services.AddScoped<IValidator<PaymentDto>, PaymentValidator>();
 
         services.AddScoped<IPortalService, PortalService>();
+
+        services.AddScoped<IChangeRequestService, ChangeRequestService>();
+        services.AddScoped<IValidator<ChangeRequestCreateDto>, ChangeRequestCreateValidator>();
 
         return services;
     }

@@ -20,6 +20,10 @@ public class MenuConfiguration : IEntityTypeConfiguration<Menu>
               .HasMaxLength(100)
               .HasColumnName("name");
 
+        entity.Property(e => e.TranslationKey)
+              .HasMaxLength(100)
+              .HasColumnName("translation_key");
+
         entity.Property(e => e.Route)
               .HasMaxLength(150)
               .HasColumnName("route");

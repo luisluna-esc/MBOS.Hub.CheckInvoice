@@ -42,5 +42,18 @@ public class IssueConfiguration : IEntityTypeConfiguration<Issue>
         entity.Property(e => e.Description)
               .HasMaxLength(255)
               .HasColumnName("description");
+
+        entity.Property(e => e.CreatedAt)
+              .IsRequired()
+              .HasColumnName("created_at")
+              .HasColumnType("timestamp without time zone");
+
+        entity.Property(e => e.CreatedById)
+              .HasColumnName("created_by");
+
+        entity.Property(e => e.IsVoided)
+              .IsRequired()
+              .HasColumnName("is_voided")
+              .HasDefaultValue(false);
     }
 }

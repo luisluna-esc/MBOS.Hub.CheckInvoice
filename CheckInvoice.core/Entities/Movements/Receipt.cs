@@ -12,4 +12,7 @@ public class Receipt
     public string? Description { get; set; }
     public DateTime IssueDate { get; set; } = DateTime.UtcNow;
     public decimal? InvoiceTotal { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public long? CreatedById { get; set; }
+    public bool IsVoided { get; set; }
 }

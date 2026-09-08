@@ -4,6 +4,7 @@ using CheckInvoice.Application.Interfaces.Products;
 using CheckInvoice.core.Configuration;
 using CheckInvoice.core.Entities.Catalogs;
 using CheckInvoice.core.Entities.Products;
+using CheckInvoice.core.Entities.Warehouses;
 using CheckInvoice.core.Entities.ResponseApi.Details;
 using CheckInvoice.core.Entities.ResponseApi.DisplayFormat;
 using CheckInvoice.core.Interfaces;
@@ -41,7 +42,7 @@ public class ProductService : IProductService
 
         if (!string.IsNullOrWhiteSpace(productQueryFilter.Code))
         {
-            query = query.Where(p => p.Code == productQueryFilter.Code);
+            query = query.Where(p => p.Code != null && p.Code.Contains(productQueryFilter.Code));
         }
 
         if (productQueryFilter.DepartmentId.HasValue)
@@ -62,6 +63,14 @@ public class ProductService : IProductService
         if (productQueryFilter.IsActive.HasValue)
         {
             query = query.Where(p => p.IsActive == productQueryFilter.IsActive.Value);
+        }
+
+        if (productQueryFilter.WarehouseId.HasValue)
+        {
+            var warehouseId = productQueryFilter.WarehouseId.Value;
+            var stockQuery = _unitOfWork.Repository<Stock>().Query();
+            query = query.Where(p => stockQuery.Any(s =>
+                s.ProductId == p.ProductId && s.WarehouseId == warehouseId && s.Quantity > 0));
         }
 
         var totalRecords = await query.CountAsync();
@@ -107,19 +116,21 @@ public class ProductService : IProductService
 
         var product = new Product
         {
-            Code = productDto.Code,
             Name = productDto.Name,
             DepartmentId = productDto.DepartmentId,
             SubDepartmentId = productDto.SubDepartmentId,
             MediaTypeId = productDto.MediaTypeId,
-            UnitOfMeasure = productDto.UnitOfMeasure,
             Price = productDto.Price,
-            MinStock = productDto.MinStock,
-            MaxStock = productDto.MaxStock,
             IsActive = productDto.IsActive
         };
 
-        await _unitOfWork.Repository<Product>().AddAsync(product);
+        var repository = _unitOfWork.Repository<Product>();
+        await repository.AddAsync(product);
+        await _unitOfWork.SaveChangesAsync();
+
+        // El código se genera a partir del ProductId asignado por la base de datos, no lo envía el cliente.
+        product.Code = product.ProductId.ToString("D5");
+        repository.Update(product);
         await _unitOfWork.SaveChangesAsync();
 
         return new ResponsePost
@@ -162,15 +173,12 @@ public class ProductService : IProductService
             };
         }
 
-        product.Code = productDto.Code;
+        // Code no se toca aquí: se genera una sola vez al crear y es inmutable.
         product.Name = productDto.Name;
         product.DepartmentId = productDto.DepartmentId;
         product.SubDepartmentId = productDto.SubDepartmentId;
         product.MediaTypeId = productDto.MediaTypeId;
-        product.UnitOfMeasure = productDto.UnitOfMeasure;
         product.Price = productDto.Price;
-        product.MinStock = productDto.MinStock;
-        product.MaxStock = productDto.MaxStock;
         product.IsActive = productDto.IsActive;
 
         repository.Update(product);
@@ -239,10 +247,7 @@ public class ProductService : IProductService
         DepartmentId = product.DepartmentId,
         SubDepartmentId = product.SubDepartmentId,
         MediaTypeId = product.MediaTypeId,
-        UnitOfMeasure = product.UnitOfMeasure,
         Price = product.Price,
-        MinStock = product.MinStock,
-        MaxStock = product.MaxStock,
         IsActive = product.IsActive
     };
 }

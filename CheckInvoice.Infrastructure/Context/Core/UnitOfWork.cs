@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using CheckInvoice.core.Interfaces;
 using CheckInvoice.Infrastructure.Context;
+using Microsoft.EntityFrameworkCore;
 
 namespace CheckInvoice.Infrastructure.Context.Core;
 
@@ -22,6 +23,9 @@ public class UnitOfWork : IUnitOfWork
     }
 
     public Task<int> SaveChangesAsync() => _context.SaveChangesAsync();
+
+    public Task<List<T>> SqlQueryAsync<T>(string sql, params object[] parameters) where T : class
+        => _context.Database.SqlQueryRaw<T>(sql, parameters).ToListAsync();
 
     public void Dispose()
     {

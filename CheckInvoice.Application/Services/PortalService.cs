@@ -1,6 +1,7 @@
 using System.Net;
 using CheckInvoice.Application.Dtos.Finance;
 using CheckInvoice.Application.Dtos.Movements;
+using CheckInvoice.Application.Dtos.Portal;
 using CheckInvoice.Application.Interfaces.Portal;
 using CheckInvoice.Application.Interfaces.Security;
 using CheckInvoice.core.Configuration;
@@ -11,6 +12,7 @@ using CheckInvoice.core.Entities.ResponseApi.Details;
 using CheckInvoice.core.Entities.ResponseApi.DisplayFormat;
 using CheckInvoice.core.Interfaces;
 using CheckInvoice.core.QueryFilters.Pagination;
+using CheckInvoice.core.QueryFilters.Portal;
 using Microsoft.EntityFrameworkCore;
 
 namespace CheckInvoice.Application.Services;
@@ -45,6 +47,11 @@ public class PortalService : IPortalService
         var totalRecords = await query.CountAsync();
         var items = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
 
+        var issueIds = items.Where(a => a.IssueId.HasValue).Select(a => a.IssueId!.Value).Distinct().ToList();
+        var issueDatesById = await _unitOfWork.Repository<Issue>().Query()
+            .Where(i => issueIds.Contains(i.IssueId))
+            .ToDictionaryAsync(i => i.IssueId, i => i.IssueDate);
+
         return new ResponseGetObject
         {
             Data = new PagedResult<AccountReceivableDto>
@@ -53,10 +60,12 @@ public class PortalService : IPortalService
                 {
                     AccountReceivableId = a.AccountReceivableId,
                     IssueId = a.IssueId,
+                    IssueDate = a.IssueId.HasValue && issueDatesById.TryGetValue(a.IssueId.Value, out var issueDate) ? issueDate : null,
                     ClientId = a.ClientId,
                     TotalAmount = a.TotalAmount,
                     OutstandingBalance = a.OutstandingBalance,
                     PaymentType = a.PaymentType,
+                    PaymentDetail = a.PaymentDetail,
                     DueDate = a.DueDate,
                     Status = a.Status,
                     CreatedAt = a.CreatedAt,
@@ -157,7 +166,7 @@ public class PortalService : IPortalService
         };
     }
 
-    public async Task<ResponseGetObject> GetMyDeposits(PaginationQueryFilter paginationQueryFilter)
+    public async Task<ResponseGetObject> GetMyIssues(PaginationQueryFilter paginationQueryFilter, PortalDateRangeQueryFilter dateRangeQueryFilter)
     {
         var clientId = await ResolveMyClientId();
         if (clientId is null)
@@ -167,27 +176,42 @@ public class PortalService : IPortalService
 
         var (pageSize, pageNumber) = ResolvePaging(paginationQueryFilter);
 
-        var query = _unitOfWork.Repository<Deposit>().Query()
-            .Where(d => d.ClientId == clientId.Value)
-            .OrderByDescending(d => d.DepositDate);
+        var query = _unitOfWork.Repository<Issue>().Query()
+            .Where(i => i.ClientId == clientId.Value);
+
+        if (dateRangeQueryFilter.DateFrom.HasValue)
+        {
+            var dateFrom = dateRangeQueryFilter.DateFrom.Value.ToDateTime(TimeOnly.MinValue);
+            query = query.Where(i => i.IssueDate >= dateFrom);
+        }
+
+        if (dateRangeQueryFilter.DateTo.HasValue)
+        {
+            var dateTo = dateRangeQueryFilter.DateTo.Value.ToDateTime(TimeOnly.MaxValue);
+            query = query.Where(i => i.IssueDate <= dateTo);
+        }
+
+        query = query.OrderByDescending(i => i.IssueDate);
 
         var totalRecords = await query.CountAsync();
         var items = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
 
+        var issueIds = items.Select(i => i.IssueId).ToList();
+        var totalsByIssueId = await _unitOfWork.Repository<IssueDetail>().Query()
+            .Where(d => issueIds.Contains(d.IssueId))
+            .GroupBy(d => d.IssueId)
+            .Select(g => new { IssueId = g.Key, Total = g.Sum(d => d.TotalCost) })
+            .ToDictionaryAsync(g => g.IssueId, g => g.Total);
+
         return new ResponseGetObject
         {
-            Data = new PagedResult<DepositDto>
+            Data = new PagedResult<PortalIssueDto>
             {
-                Items = items.Select(d => new DepositDto
+                Items = items.Select(i => new PortalIssueDto
                 {
-                    DepositId = d.DepositId,
-                    ClientId = d.ClientId,
-                    ProductId = d.ProductId,
-                    ShipmentId = d.ShipmentId,
-                    ReceiptNumber = d.ReceiptNumber,
-                    DepositDate = d.DepositDate,
-                    Amount = d.Amount,
-                    Notes = d.Notes
+                    IssueId = i.IssueId,
+                    IssueDate = i.IssueDate,
+                    Total = totalsByIssueId.GetValueOrDefault(i.IssueId, 0)
                 }),
                 TotalRecords = totalRecords,
                 PageNumber = pageNumber,

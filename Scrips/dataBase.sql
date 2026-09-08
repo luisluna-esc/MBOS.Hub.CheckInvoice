@@ -17,34 +17,54 @@ CREATE TABLE configuration (
 
 CREATE TABLE country (
     country_id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL
+    name VARCHAR(100) NOT NULL,
+    CONSTRAINT uq_country_name UNIQUE (name)
 );
 
 CREATE TABLE document_type (
     document_type_id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL
+    name VARCHAR(50) NOT NULL,
+    CONSTRAINT uq_document_type_name UNIQUE (name)
+);
+
+CREATE TABLE special_case (
+    special_case_id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(10) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    CONSTRAINT uq_special_case_code UNIQUE (code)
+);
+
+CREATE TABLE void_reason (
+    void_reason_id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(20) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    CONSTRAINT uq_void_reason_code UNIQUE (code)
 );
 
 CREATE TABLE church_type (
     church_type_id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL
+    name VARCHAR(50) NOT NULL,
+    CONSTRAINT uq_church_type_name UNIQUE (name)
 );
 
 CREATE TABLE issue_type (
     issue_type_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT uq_issue_type_name UNIQUE (name)
 );
 
 CREATE TABLE receipt_type (
     receipt_type_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT uq_receipt_type_name UNIQUE (name)
 );
 
 CREATE TABLE print_type (
     print_type_id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL
+    name VARCHAR(50) NOT NULL,
+    CONSTRAINT uq_print_type_name UNIQUE (name)
 );
 
 CREATE TABLE media_type (
@@ -68,13 +88,15 @@ CREATE TABLE sub_department (
 CREATE TABLE mission (
     mission_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT uq_mission_name UNIQUE (name)
 );
 
 CREATE TABLE province (
     province_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT uq_province_name UNIQUE (name)
 );
 
 CREATE TABLE warehouse_period (
@@ -227,6 +249,7 @@ CREATE INDEX idx_role_permission_permission ON role_permission(permission_id);
 CREATE TABLE menu (
     menu_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
+    translation_key VARCHAR(100),
     route VARCHAR(150),
     icon VARCHAR(50),
     parent_menu_id BIGINT,
@@ -234,11 +257,25 @@ CREATE TABLE menu (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     permission_id BIGINT,
     CONSTRAINT fk_menu_parent FOREIGN KEY (parent_menu_id) REFERENCES menu(menu_id) ON DELETE CASCADE,
-    CONSTRAINT fk_menu_permission FOREIGN KEY (permission_id) REFERENCES permission(permission_id)
+    CONSTRAINT fk_menu_permission FOREIGN KEY (permission_id) REFERENCES permission(permission_id),
+    CONSTRAINT uq_menu_name UNIQUE (name)
 );
 
 CREATE INDEX idx_menu_parent ON menu(parent_menu_id);
 CREATE INDEX idx_menu_permission ON menu(permission_id);
+
+CREATE TABLE menu_role (
+    menu_role_id BIGSERIAL PRIMARY KEY,
+    menu_id BIGINT NOT NULL,
+    role_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_menu_role_menu FOREIGN KEY (menu_id) REFERENCES menu(menu_id) ON DELETE CASCADE,
+    CONSTRAINT fk_menu_role_role FOREIGN KEY (role_id) REFERENCES role(role_id) ON DELETE CASCADE,
+    CONSTRAINT uq_menu_role UNIQUE (menu_id, role_id)
+);
+
+CREATE INDEX idx_menu_role_menu ON menu_role(menu_id);
+CREATE INDEX idx_menu_role_role ON menu_role(role_id);
 
 CREATE TABLE church (
     church_id BIGSERIAL PRIMARY KEY,
@@ -257,23 +294,38 @@ CREATE INDEX idx_church_district ON church(district_id);
 -- LEVEL 5: client, supplier, product
 -- =====================================================================
 
+-- Identidad compartida entre Cliente y Proveedor: cuando la misma persona/empresa
+-- es ambas cosas, su fila de client y su fila de supplier apuntan a la misma party.
+CREATE TABLE party (
+    party_id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    tax_id VARCHAR(20),
+    email VARCHAR(150),
+    mobile_phone VARCHAR(20)
+);
+
+CREATE UNIQUE INDEX uq_party_tax_id ON party (tax_id) WHERE tax_id IS NOT NULL AND tax_id <> '';
+CREATE UNIQUE INDEX uq_party_email ON party (lower(email)) WHERE email IS NOT NULL AND email <> '';
+
 CREATE TABLE client (
     client_id BIGSERIAL PRIMARY KEY,
+    party_id BIGINT NOT NULL,
     app_user_id BIGINT,
     document_type_id BIGINT,
-    tax_id VARCHAR(20),
-    name VARCHAR(150) NOT NULL,
-    email VARCHAR(150),
-    mobile_phone VARCHAR(20),
     district_id BIGINT,
     church_id BIGINT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    complement VARCHAR(10),
+    complement VARCHAR(5),
+    special_case_id BIGINT,
+    is_pastor BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_client_party FOREIGN KEY (party_id) REFERENCES party(party_id),
     CONSTRAINT fk_client_app_user FOREIGN KEY (app_user_id) REFERENCES app_user(app_user_id),
     CONSTRAINT fk_client_document_type FOREIGN KEY (document_type_id) REFERENCES document_type(document_type_id),
     CONSTRAINT fk_client_district FOREIGN KEY (district_id) REFERENCES district(district_id),
     CONSTRAINT fk_client_church FOREIGN KEY (church_id) REFERENCES church(church_id),
-    CONSTRAINT uq_client_tax_id UNIQUE (tax_id)
+    CONSTRAINT fk_client_special_case FOREIGN KEY (special_case_id) REFERENCES special_case(special_case_id),
+    CONSTRAINT uq_client_party UNIQUE (party_id),
+    CONSTRAINT uq_client_app_user UNIQUE (app_user_id)
 );
 
 CREATE INDEX idx_client_district ON client(district_id);
@@ -281,18 +333,17 @@ CREATE INDEX idx_client_church ON client(church_id);
 
 CREATE TABLE supplier (
     supplier_id BIGSERIAL PRIMARY KEY,
+    party_id BIGINT NOT NULL,
     code VARCHAR(20),
     legal_name VARCHAR(150),
-    name VARCHAR(150) NOT NULL,
-    tax_id VARCHAR(20),
     country_id BIGINT,
     address VARCHAR(255),
     phone VARCHAR(20),
-    mobile_phone VARCHAR(20),
-    email VARCHAR(150),
     notes VARCHAR(255),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    CONSTRAINT fk_supplier_country FOREIGN KEY (country_id) REFERENCES country(country_id)
+    CONSTRAINT fk_supplier_party FOREIGN KEY (party_id) REFERENCES party(party_id),
+    CONSTRAINT fk_supplier_country FOREIGN KEY (country_id) REFERENCES country(country_id),
+    CONSTRAINT uq_supplier_party UNIQUE (party_id)
 );
 
 CREATE TABLE product (
@@ -302,10 +353,7 @@ CREATE TABLE product (
     department_id BIGINT,
     sub_department_id BIGINT,
     media_type_id BIGINT,
-    unit_of_measure VARCHAR(20),
     price NUMERIC(12,2),
-    min_stock NUMERIC(12,2),
-    max_stock NUMERIC(12,2),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT fk_product_department FOREIGN KEY (department_id) REFERENCES department(department_id),
     CONSTRAINT fk_product_sub_department FOREIGN KEY (sub_department_id) REFERENCES sub_department(sub_department_id),
@@ -344,10 +392,14 @@ CREATE TABLE receipt (
     description VARCHAR(255),
     issue_date TIMESTAMP NOT NULL DEFAULT NOW(),
     invoice_total NUMERIC(12,2),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_by BIGINT,
+    is_voided BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_receipt_supplier FOREIGN KEY (supplier_id) REFERENCES supplier(supplier_id),
     CONSTRAINT fk_receipt_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouse(warehouse_id),
     CONSTRAINT fk_receipt_warehouse_period FOREIGN KEY (warehouse_period_id) REFERENCES warehouse_period(warehouse_period_id),
-    CONSTRAINT fk_receipt_receipt_type FOREIGN KEY (receipt_type_id) REFERENCES receipt_type(receipt_type_id)
+    CONSTRAINT fk_receipt_receipt_type FOREIGN KEY (receipt_type_id) REFERENCES receipt_type(receipt_type_id),
+    CONSTRAINT fk_receipt_created_by FOREIGN KEY (created_by) REFERENCES app_user(app_user_id)
 );
 
 CREATE INDEX idx_receipt_warehouse ON receipt(warehouse_id);
@@ -364,11 +416,15 @@ CREATE TABLE issue (
     issue_date TIMESTAMP NOT NULL DEFAULT NOW(),
     print_type_id BIGINT,
     description VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_by BIGINT,
+    is_voided BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_issue_issue_type FOREIGN KEY (issue_type_id) REFERENCES issue_type(issue_type_id),
     CONSTRAINT fk_issue_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouse(warehouse_id),
     CONSTRAINT fk_issue_warehouse_period FOREIGN KEY (warehouse_period_id) REFERENCES warehouse_period(warehouse_period_id),
     CONSTRAINT fk_issue_client FOREIGN KEY (client_id) REFERENCES client(client_id),
-    CONSTRAINT fk_issue_print_type FOREIGN KEY (print_type_id) REFERENCES print_type(print_type_id)
+    CONSTRAINT fk_issue_print_type FOREIGN KEY (print_type_id) REFERENCES print_type(print_type_id),
+    CONSTRAINT fk_issue_created_by FOREIGN KEY (created_by) REFERENCES app_user(app_user_id)
 );
 
 CREATE INDEX idx_issue_warehouse ON issue(warehouse_id);
@@ -381,12 +437,18 @@ CREATE TABLE transfer (
     destination_warehouse_id BIGINT,
     sender_user_id BIGINT,
     receiver_user_id BIGINT,
+    receiver_client_id BIGINT,
     transfer_date TIMESTAMP NOT NULL DEFAULT NOW(),
     notes TEXT,
+    is_approved BOOLEAN NOT NULL DEFAULT TRUE,
+    approved_by_id BIGINT,
+    approved_at TIMESTAMP,
     CONSTRAINT fk_transfer_source_warehouse FOREIGN KEY (source_warehouse_id) REFERENCES warehouse(warehouse_id),
     CONSTRAINT fk_transfer_destination_warehouse FOREIGN KEY (destination_warehouse_id) REFERENCES warehouse(warehouse_id),
     CONSTRAINT fk_transfer_sender_user FOREIGN KEY (sender_user_id) REFERENCES app_user(app_user_id),
-    CONSTRAINT fk_transfer_receiver_user FOREIGN KEY (receiver_user_id) REFERENCES app_user(app_user_id)
+    CONSTRAINT fk_transfer_receiver_user FOREIGN KEY (receiver_user_id) REFERENCES app_user(app_user_id),
+    CONSTRAINT fk_transfer_receiver_client FOREIGN KEY (receiver_client_id) REFERENCES client(client_id),
+    CONSTRAINT fk_transfer_approved_by FOREIGN KEY (approved_by_id) REFERENCES app_user(app_user_id)
 );
 
 CREATE INDEX idx_transfer_date ON transfer(transfer_date);
@@ -403,22 +465,6 @@ CREATE TABLE stock (
 );
 
 CREATE INDEX idx_stock_product ON stock(product_id);
-
-CREATE TABLE deposit (
-    deposit_id BIGSERIAL PRIMARY KEY,
-    client_id BIGINT,
-    product_id BIGINT,
-    shipment_id BIGINT,
-    receipt_number VARCHAR(20),
-    deposit_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    amount NUMERIC(12,2) NOT NULL,
-    notes VARCHAR(255),
-    CONSTRAINT fk_deposit_client FOREIGN KEY (client_id) REFERENCES client(client_id),
-    CONSTRAINT fk_deposit_product FOREIGN KEY (product_id) REFERENCES product(product_id),
-    CONSTRAINT fk_deposit_shipment FOREIGN KEY (shipment_id) REFERENCES shipment(shipment_id)
-);
-
-CREATE INDEX idx_deposit_client ON deposit(client_id);
 
 CREATE TABLE discount (
     discount_id BIGSERIAL PRIMARY KEY,
@@ -509,6 +555,7 @@ CREATE TABLE account_receivable (
     total_amount NUMERIC(12,2) NOT NULL,
     outstanding_balance NUMERIC(12,2) NOT NULL,
     payment_type VARCHAR(20) NOT NULL,
+    payment_detail VARCHAR(255),
     due_date DATE,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -573,11 +620,92 @@ CREATE TABLE payment (
 CREATE INDEX idx_payment_account_receivable ON payment(account_receivable_id);
 
 -- =====================================================================
+-- LEVEL 10: change_request (edit/delete approval workflow for
+-- immutable movement headers: receipt, issue, transfer)
+-- =====================================================================
+
+CREATE TABLE change_request (
+    change_request_id BIGSERIAL PRIMARY KEY,
+    table_name VARCHAR(50) NOT NULL,
+    record_id BIGINT NOT NULL,
+    action VARCHAR(20) NOT NULL,
+    current_data JSONB,
+    proposed_data JSONB,
+    reason VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    requested_by BIGINT NOT NULL,
+    requested_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    reviewed_by BIGINT,
+    reviewed_at TIMESTAMP,
+    review_notes VARCHAR(255),
+    CONSTRAINT fk_change_request_requested_by FOREIGN KEY (requested_by) REFERENCES app_user(app_user_id),
+    CONSTRAINT fk_change_request_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES app_user(app_user_id),
+    CONSTRAINT chk_change_request_table CHECK (table_name IN ('receipt', 'issue', 'transfer')),
+    CONSTRAINT chk_change_request_action CHECK (action IN ('edit', 'delete'))
+);
+
+CREATE INDEX idx_change_request_status ON change_request(status);
+CREATE INDEX idx_change_request_table_record ON change_request(table_name, record_id);
+
+-- =====================================================================
+-- LEVEL 10b: issue_void_request (anulación de Salidas: Auxiliar Contador
+-- solicita, Contador o M-BOS aprueba/rechaza; solo una solicitud
+-- pendiente por Salida a la vez)
+-- =====================================================================
+
+CREATE TABLE issue_void_request (
+    issue_void_request_id BIGSERIAL PRIMARY KEY,
+    issue_id BIGINT NOT NULL,
+    void_reason_id BIGINT NOT NULL,
+    detail VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    requested_by BIGINT NOT NULL,
+    requested_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    reviewed_by BIGINT,
+    reviewed_at TIMESTAMP,
+    review_notes VARCHAR(255),
+    CONSTRAINT fk_issue_void_request_issue FOREIGN KEY (issue_id) REFERENCES issue(issue_id),
+    CONSTRAINT fk_issue_void_request_reason FOREIGN KEY (void_reason_id) REFERENCES void_reason(void_reason_id),
+    CONSTRAINT fk_issue_void_request_requested_by FOREIGN KEY (requested_by) REFERENCES app_user(app_user_id),
+    CONSTRAINT fk_issue_void_request_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES app_user(app_user_id),
+    CONSTRAINT chk_issue_void_request_status CHECK (status IN ('pending', 'approved', 'rejected'))
+);
+
+CREATE INDEX idx_issue_void_request_issue ON issue_void_request(issue_id);
+CREATE UNIQUE INDEX uq_issue_void_request_pending ON issue_void_request(issue_id) WHERE status = 'pending';
+
+CREATE TABLE receipt_void_request (
+    receipt_void_request_id BIGSERIAL PRIMARY KEY,
+    receipt_id BIGINT NOT NULL,
+    void_reason_id BIGINT NOT NULL,
+    detail VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    requested_by BIGINT NOT NULL,
+    requested_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    reviewed_by BIGINT,
+    reviewed_at TIMESTAMP,
+    review_notes VARCHAR(255),
+    CONSTRAINT fk_receipt_void_request_receipt FOREIGN KEY (receipt_id) REFERENCES receipt(receipt_id),
+    CONSTRAINT fk_receipt_void_request_reason FOREIGN KEY (void_reason_id) REFERENCES void_reason(void_reason_id),
+    CONSTRAINT fk_receipt_void_request_requested_by FOREIGN KEY (requested_by) REFERENCES app_user(app_user_id),
+    CONSTRAINT fk_receipt_void_request_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES app_user(app_user_id),
+    CONSTRAINT chk_receipt_void_request_status CHECK (status IN ('pending', 'approved', 'rejected'))
+);
+
+CREATE INDEX idx_receipt_void_request_receipt ON receipt_void_request(receipt_id);
+CREATE UNIQUE INDEX uq_receipt_void_request_pending ON receipt_void_request(receipt_id) WHERE status = 'pending';
+
+-- =====================================================================
 -- SEED DATA
 -- =====================================================================
 
 INSERT INTO configuration (key, value, description)
 VALUES ('discount_accounting_account', '1135005', 'Accounting account code for missionary book discounts');
+
+INSERT INTO void_reason (code, name) VALUES
+('DATE_ERROR', 'Fallo de fecha'),
+('NAME_ERROR', 'Error de nombre'),
+('OTHER', 'Otros');
 
 -- =====================================================================
 -- END OF SCRIPT

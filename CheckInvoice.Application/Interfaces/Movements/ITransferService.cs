@@ -10,4 +10,5 @@ public interface ITransferService
     Task<ResponseGetObject> GetAllTransfers(PaginationQueryFilter paginationQueryFilter, TransferQueryFilter transferQueryFilter);
     Task<ResponseGetObject> GetTransferDetails(long transferId);
     Task<ResponsePost> InsertTransfer(TransferRequestDto transferRequestDto);
+    Task<ResponsePost> ApproveTransfer(long transferId);
 }

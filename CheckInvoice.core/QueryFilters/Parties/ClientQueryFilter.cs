@@ -8,4 +8,6 @@ public class ClientQueryFilter
     public long? DistrictId { get; set; }
     public long? ChurchId { get; set; }
     public bool? IsActive { get; set; }
+    public bool? IsPastor { get; set; }
+    public bool? PendingPortalAccess { get; set; }
 }

@@ -1,5 +1,6 @@
 using System.Net;
 using CheckInvoice.Application.Dtos.Finance;
+using CheckInvoice.Application.Dtos.StoredProcedures;
 using CheckInvoice.Application.Interfaces.Finance;
 using CheckInvoice.Application.Interfaces.Security;
 using CheckInvoice.core.Configuration;
@@ -35,46 +36,62 @@ public class AccountReceivableService : IAccountReceivableService
         _currentUserService = currentUserService;
     }
 
+    // EF Core mapea las columnas del resultado de FromSql/SqlQueryRaw por el nombre exacto
+    // de la propiedad C# (ej. "ClientId"), no por el nombre de columna en snake_case que
+    // devuelve la función SQL (ej. client_id) — de ahí los alias explícitos.
+    private const string GetAccountReceivablesSql = """
+        SELECT
+            account_receivable_id AS "AccountReceivableId",
+            issue_id AS "IssueId",
+            issue_date AS "IssueDate",
+            client_id AS "ClientId",
+            total_amount AS "TotalAmount",
+            outstanding_balance AS "OutstandingBalance",
+            payment_type AS "PaymentType",
+            payment_detail AS "PaymentDetail",
+            due_date AS "DueDate",
+            status AS "Status",
+            created_at AS "CreatedAt",
+            created_by_id AS "CreatedById",
+            total_records AS "TotalRecords"
+        FROM sp_get_account_receivables({0}::bigint, {1}::bigint, {2}::varchar, {3}::varchar, {4}::int, {5}::int)
+        """;
+
     public async Task<ResponseGetObject> GetAllAccountReceivables(PaginationQueryFilter paginationQueryFilter, AccountReceivableQueryFilter accountReceivableQueryFilter)
     {
         var pageSize = paginationQueryFilter.PageSize > 0 ? paginationQueryFilter.PageSize : _paginationOptions.InitialPageSize;
         var pageNumber = paginationQueryFilter.PageNumber > 0 ? paginationQueryFilter.PageNumber : _paginationOptions.InitialPageNumber;
 
-        var query = _unitOfWork.Repository<AccountReceivable>().Query();
+        // Piloto de rendimiento: antes esto hacía 2 consultas separadas (página + fecha de la
+        // salida vinculada). Ahora es una sola consulta con LEFT JOIN via
+        // sp_get_account_receivables (Scrips/storedProcedures.sql).
+        var rows = await _unitOfWork.SqlQueryAsync<AccountReceivableGetAllRow>(
+            GetAccountReceivablesSql,
+            (object?)accountReceivableQueryFilter.AccountReceivableId ?? DBNull.Value,
+            (object?)accountReceivableQueryFilter.ClientId ?? DBNull.Value,
+            (object?)accountReceivableQueryFilter.PaymentType ?? DBNull.Value,
+            (object?)accountReceivableQueryFilter.Status ?? DBNull.Value,
+            pageNumber,
+            pageSize);
 
-        if (accountReceivableQueryFilter.AccountReceivableId.HasValue)
+        var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
+
+        // Mismo motivo que en IssueService: SqlQueryRaw no pasa por el ValueConverter global
+        // de AppDbContext que marca todo DateTime como Utc al leer.
+        foreach (var row in rows)
         {
-            query = query.Where(a => a.AccountReceivableId == accountReceivableQueryFilter.AccountReceivableId.Value);
+            row.CreatedAt = DateTime.SpecifyKind(row.CreatedAt, DateTimeKind.Utc);
+            if (row.IssueDate.HasValue)
+            {
+                row.IssueDate = DateTime.SpecifyKind(row.IssueDate.Value, DateTimeKind.Utc);
+            }
         }
-
-        if (accountReceivableQueryFilter.ClientId.HasValue)
-        {
-            query = query.Where(a => a.ClientId == accountReceivableQueryFilter.ClientId.Value);
-        }
-
-        if (!string.IsNullOrWhiteSpace(accountReceivableQueryFilter.PaymentType))
-        {
-            query = query.Where(a => a.PaymentType == accountReceivableQueryFilter.PaymentType);
-        }
-
-        if (!string.IsNullOrWhiteSpace(accountReceivableQueryFilter.Status))
-        {
-            query = query.Where(a => a.Status == accountReceivableQueryFilter.Status);
-        }
-
-        var totalRecords = await query.CountAsync();
-
-        var accountReceivables = await query
-            .OrderByDescending(a => a.CreatedAt)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
 
         return new ResponseGetObject
         {
             Data = new PagedResult<AccountReceivableDto>
             {
-                Items = accountReceivables.Select(ToDto),
+                Items = rows,
                 TotalRecords = totalRecords,
                 PageNumber = pageNumber,
                 PageSize = pageSize
@@ -120,6 +137,7 @@ public class AccountReceivableService : IAccountReceivableService
             TotalAmount = accountReceivableDto.TotalAmount,
             OutstandingBalance = accountReceivableDto.TotalAmount,
             PaymentType = accountReceivableDto.PaymentType,
+            PaymentDetail = accountReceivableDto.PaymentDetail,
             DueDate = accountReceivableDto.DueDate,
             Status = "pending",
             CreatedAt = DateTime.UtcNow,
@@ -137,17 +155,4 @@ public class AccountReceivableService : IAccountReceivableService
         };
     }
 
-    private static AccountReceivableDto ToDto(AccountReceivable accountReceivable) => new()
-    {
-        AccountReceivableId = accountReceivable.AccountReceivableId,
-        IssueId = accountReceivable.IssueId,
-        ClientId = accountReceivable.ClientId,
-        TotalAmount = accountReceivable.TotalAmount,
-        OutstandingBalance = accountReceivable.OutstandingBalance,
-        PaymentType = accountReceivable.PaymentType,
-        DueDate = accountReceivable.DueDate,
-        Status = accountReceivable.Status,
-        CreatedAt = accountReceivable.CreatedAt,
-        CreatedById = accountReceivable.CreatedById
-    };
 }

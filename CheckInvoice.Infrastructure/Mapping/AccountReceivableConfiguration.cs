@@ -36,6 +36,10 @@ public class AccountReceivableConfiguration : IEntityTypeConfiguration<AccountRe
               .HasMaxLength(20)
               .HasColumnName("payment_type");
 
+        entity.Property(e => e.PaymentDetail)
+              .HasMaxLength(255)
+              .HasColumnName("payment_detail");
+
         entity.Property(e => e.DueDate)
               .HasColumnName("due_date")
               .HasColumnType("date");

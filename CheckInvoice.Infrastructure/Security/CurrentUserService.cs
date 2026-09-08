@@ -21,4 +21,7 @@ public class CurrentUserService : ICurrentUserService
             return long.TryParse(claimValue, out var appUserId) ? appUserId : null;
         }
     }
+
+    public bool HasPermission(string code) =>
+        _httpContextAccessor.HttpContext?.User?.HasClaim("permission", code) ?? false;
 }

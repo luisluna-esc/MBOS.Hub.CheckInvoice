@@ -27,6 +27,9 @@ public class TransferConfiguration : IEntityTypeConfiguration<Transfer>
         entity.Property(e => e.ReceiverUserId)
               .HasColumnName("receiver_user_id");
 
+        entity.Property(e => e.ReceiverClientId)
+              .HasColumnName("receiver_client_id");
+
         entity.Property(e => e.TransferDate)
               .IsRequired()
               .HasColumnName("transfer_date")
@@ -35,5 +38,17 @@ public class TransferConfiguration : IEntityTypeConfiguration<Transfer>
         entity.Property(e => e.Notes)
               .HasColumnName("notes")
               .HasColumnType("text");
+
+        entity.Property(e => e.IsApproved)
+              .IsRequired()
+              .HasColumnName("is_approved")
+              .HasDefaultValue(true);
+
+        entity.Property(e => e.ApprovedById)
+              .HasColumnName("approved_by_id");
+
+        entity.Property(e => e.ApprovedAt)
+              .HasColumnName("approved_at")
+              .HasColumnType("timestamp without time zone");
     }
 }

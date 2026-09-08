@@ -72,6 +72,14 @@ builder.Services.AddSwaggerGen(options =>
         In = ParameterLocation.Header,
         Description = "Enter the access token returned by /api/auth/login."
     });
+
+    // Marks every operation as requiring the "Bearer" scheme so the Swagger UI "Authorize"
+    // button actually attaches the token to requests (AddSecurityDefinition alone only
+    // documents the scheme, it does not apply it to any operation).
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document, null)] = []
+    });
 });
 
 builder.Services.AddInfrastructure(builder.Configuration);

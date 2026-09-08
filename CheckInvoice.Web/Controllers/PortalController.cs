@@ -1,5 +1,6 @@
 using CheckInvoice.Application.Interfaces.Portal;
 using CheckInvoice.core.QueryFilters.Pagination;
+using CheckInvoice.core.QueryFilters.Portal;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -40,11 +41,13 @@ public class PortalController : ControllerBase
         return StatusCode((int)result.StatusCode, result);
     }
 
-    [Authorize(Policy = "portal.deposit.view")]
-    [HttpGet("deposits")]
-    public async Task<IActionResult> GetMyDeposits([FromQuery] PaginationQueryFilter paginationQueryFilter)
+    [Authorize(Policy = "portal.issue.view")]
+    [HttpGet("issues")]
+    public async Task<IActionResult> GetMyIssues(
+        [FromQuery] PaginationQueryFilter paginationQueryFilter,
+        [FromQuery] PortalDateRangeQueryFilter dateRangeQueryFilter)
     {
-        var result = await _portalService.GetMyDeposits(paginationQueryFilter);
+        var result = await _portalService.GetMyIssues(paginationQueryFilter, dateRangeQueryFilter);
         return StatusCode((int)result.StatusCode, result);
     }
 }

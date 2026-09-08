@@ -10,6 +10,7 @@ public class ReceiptRequestDto
     public string? InvoiceNumber { get; set; }
     public string? Description { get; set; }
     public decimal? InvoiceTotal { get; set; }
+    public DateTime? IssueDate { get; set; }
     public List<ReceiptDetailRequestDto> Details { get; set; } = [];
 }
 

@@ -8,6 +8,7 @@ public class AccountReceivable
     public decimal TotalAmount { get; set; }
     public decimal OutstandingBalance { get; set; }
     public string PaymentType { get; set; } = string.Empty;
+    public string? PaymentDetail { get; set; }
     public DateOnly? DueDate { get; set; }
     public string Status { get; set; } = "pending";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

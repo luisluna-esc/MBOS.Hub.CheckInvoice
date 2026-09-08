@@ -8,9 +8,6 @@ public class Product
     public long? DepartmentId { get; set; }
     public long? SubDepartmentId { get; set; }
     public long? MediaTypeId { get; set; }
-    public string? UnitOfMeasure { get; set; }
     public decimal? Price { get; set; }
-    public decimal? MinStock { get; set; }
-    public decimal? MaxStock { get; set; }
     public bool IsActive { get; set; } = true;
 }

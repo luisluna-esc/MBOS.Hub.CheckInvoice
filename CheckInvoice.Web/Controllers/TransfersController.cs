@@ -41,4 +41,12 @@ public class TransfersController : ControllerBase
         var result = await _transferService.InsertTransfer(transferRequestDto);
         return StatusCode((int)result.StatusCode, result);
     }
+
+    [Authorize(Policy = "transfer.create")]
+    [HttpPost("{id}/approve")]
+    public async Task<IActionResult> Approve(long id)
+    {
+        var result = await _transferService.ApproveTransfer(id);
+        return StatusCode((int)result.StatusCode, result);
+    }
 }

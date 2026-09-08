@@ -13,5 +13,8 @@ public class AccountReceivableValidator : AbstractValidator<AccountReceivableDto
         RuleFor(x => x.PaymentType)
             .NotEmpty().WithMessage("PaymentType is required.")
             .MaximumLength(20).WithMessage("PaymentType must not exceed 20 characters.");
+
+        RuleFor(x => x.PaymentDetail)
+            .MaximumLength(255).WithMessage("PaymentDetail must not exceed 255 characters.");
     }
 }

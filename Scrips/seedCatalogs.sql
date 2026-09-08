@@ -14,7 +14,25 @@ INSERT INTO document_type (name) VALUES
 ON CONFLICT DO NOTHING;
 
 INSERT INTO church_type (name) VALUES
-('Iglesia'), ('Congregacion'), ('Grupo'), ('Nucleo')
+('Iglesia'), ('Congregacion'), ('Grupo'), ('Nucleo'), ('Filial')
+ON CONFLICT DO NOTHING;
+
+-- Clasificación vigente para iglesias nuevas (ver CURRENT_CHURCH_TYPE_NAMES en
+-- church-form-dialog.ts). Los tipos de arriba se mantienen solo por las iglesias ya
+-- importadas del Excel; el formulario de creación ya no los ofrece.
+INSERT INTO church_type (name) VALUES
+('Organizada'), ('Corporacion')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO mission (name) VALUES
+('MISIÓN BOLIVIANA OCCIDENTAL DEL NORTE'), ('UNIÓN BOLIVIANA'), ('MISIÓN DEL ORIENTE BOLIVIANO'),
+('MISIÓN BOLIVIANA CENTRAL'), ('MISIÓN BOLIVIANA OCCIDENTAL DEL SUR')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO province (name) VALUES
+('COCHABAMBA'), ('LA PAZ'), ('EL ALTO'), ('SANTA CRUZ'), ('ORURO'), ('VINTO'), ('TRINIDAD'),
+('MONTERO'), ('WARNES'), ('GUAYARAMERIN'), ('YACUIBA'), ('QUILLACOLLO'), ('ENTRE RIOS'),
+('PUERTO QUIJARRO'), ('YAPACANI'), ('TARIJA')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO issue_type (name, is_active) VALUES

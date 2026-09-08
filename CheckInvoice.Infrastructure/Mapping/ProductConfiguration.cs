@@ -33,20 +33,8 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         entity.Property(e => e.MediaTypeId)
               .HasColumnName("media_type_id");
 
-        entity.Property(e => e.UnitOfMeasure)
-              .HasMaxLength(20)
-              .HasColumnName("unit_of_measure");
-
         entity.Property(e => e.Price)
               .HasColumnName("price")
-              .HasColumnType("numeric(12,2)");
-
-        entity.Property(e => e.MinStock)
-              .HasColumnName("min_stock")
-              .HasColumnType("numeric(12,2)");
-
-        entity.Property(e => e.MaxStock)
-              .HasColumnName("max_stock")
               .HasColumnType("numeric(12,2)");
 
         entity.Property(e => e.IsActive)

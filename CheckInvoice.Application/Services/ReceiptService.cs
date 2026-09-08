@@ -1,14 +1,17 @@
 using System.Net;
 using CheckInvoice.Application.Dtos.Movements;
+using CheckInvoice.Application.Dtos.StoredProcedures;
 using CheckInvoice.Application.Interfaces.Movements;
 using CheckInvoice.Application.Interfaces.Security;
 using CheckInvoice.core.Configuration;
 using CheckInvoice.core.Entities.Catalogs;
+using CheckInvoice.core.Entities.Governance;
 using CheckInvoice.core.Entities.Movements;
 using CheckInvoice.core.Entities.Parties;
 using CheckInvoice.core.Entities.Products;
 using CheckInvoice.core.Entities.ResponseApi.Details;
 using CheckInvoice.core.Entities.ResponseApi.DisplayFormat;
+using CheckInvoice.core.Entities.Security;
 using CheckInvoice.core.Entities.Warehouses;
 using CheckInvoice.core.Interfaces;
 using CheckInvoice.core.QueryFilters.Movements;
@@ -23,59 +26,80 @@ public class ReceiptService : IReceiptService
     private readonly IUnitOfWork _unitOfWork;
     private readonly PaginationOptions _paginationOptions;
     private readonly IValidator<ReceiptRequestDto> _validator;
+    private readonly ICurrentUserService _currentUserService;
 
-    public ReceiptService(IUnitOfWork unitOfWork, PaginationOptions paginationOptions, IValidator<ReceiptRequestDto> validator)
+    public ReceiptService(
+        IUnitOfWork unitOfWork,
+        PaginationOptions paginationOptions,
+        IValidator<ReceiptRequestDto> validator,
+        ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
         _paginationOptions = paginationOptions;
         _validator = validator;
+        _currentUserService = currentUserService;
     }
+
+    // EF Core mapea las columnas del resultado de FromSql/SqlQueryRaw por el nombre exacto
+    // de la propiedad C# (ej. "SupplierId"), no por el nombre de columna en snake_case que
+    // devuelve la función SQL (ej. supplier_id) — de ahí los alias explícitos.
+    private const string GetReceiptsSql = """
+        SELECT
+            receipt_id AS "ReceiptId",
+            supplier_id AS "SupplierId",
+            tax_id AS "TaxId",
+            warehouse_id AS "WarehouseId",
+            warehouse_period_id AS "WarehousePeriodId",
+            receipt_type_id AS "ReceiptTypeId",
+            invoice_number AS "InvoiceNumber",
+            description AS "Description",
+            issue_date AS "IssueDate",
+            invoice_total AS "InvoiceTotal",
+            created_at AS "CreatedAt",
+            created_by_id AS "CreatedById",
+            created_by_full_name AS "CreatedByFullName",
+            has_pending_change_request AS "HasPendingChangeRequest",
+            is_voided AS "IsVoided",
+            has_pending_void_request AS "HasPendingVoidRequest",
+            void_reason_name AS "VoidReasonName",
+            void_detail AS "VoidDetail",
+            total_records AS "TotalRecords"
+        FROM sp_get_receipts({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::varchar, {5}::int, {6}::int)
+        """;
 
     public async Task<ResponseGetObject> GetAllReceipts(PaginationQueryFilter paginationQueryFilter, ReceiptQueryFilter receiptQueryFilter)
     {
         var pageSize = paginationQueryFilter.PageSize > 0 ? paginationQueryFilter.PageSize : _paginationOptions.InitialPageSize;
         var pageNumber = paginationQueryFilter.PageNumber > 0 ? paginationQueryFilter.PageNumber : _paginationOptions.InitialPageNumber;
 
-        var query = _unitOfWork.Repository<Receipt>().Query();
+        // Piloto de rendimiento: antes esto hacía 3 consultas separadas (página, nombre del
+        // creador, cambios pendientes). Ahora es una sola con LEFT JOIN via sp_get_receipts
+        // (Scrips/storedProcedures.sql).
+        var rows = await _unitOfWork.SqlQueryAsync<ReceiptGetAllRow>(
+            GetReceiptsSql,
+            (object?)receiptQueryFilter.ReceiptId ?? DBNull.Value,
+            (object?)receiptQueryFilter.SupplierId ?? DBNull.Value,
+            (object?)receiptQueryFilter.WarehouseId ?? DBNull.Value,
+            (object?)receiptQueryFilter.ReceiptTypeId ?? DBNull.Value,
+            (object?)receiptQueryFilter.InvoiceNumber ?? DBNull.Value,
+            pageNumber,
+            pageSize);
 
-        if (receiptQueryFilter.ReceiptId.HasValue)
+        var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
+
+        // SqlQueryRaw no pasa por el ValueConverter global de AppDbContext que marca todo
+        // DateTime como Utc al leer (ver AppDbContext.OnModelCreating).
+        foreach (var row in rows)
         {
-            query = query.Where(r => r.ReceiptId == receiptQueryFilter.ReceiptId.Value);
+            row.IssueDate = DateTime.SpecifyKind(row.IssueDate, DateTimeKind.Utc);
+            row.CreatedAt = DateTime.SpecifyKind(row.CreatedAt, DateTimeKind.Utc);
         }
-
-        if (receiptQueryFilter.SupplierId.HasValue)
-        {
-            query = query.Where(r => r.SupplierId == receiptQueryFilter.SupplierId.Value);
-        }
-
-        if (receiptQueryFilter.WarehouseId.HasValue)
-        {
-            query = query.Where(r => r.WarehouseId == receiptQueryFilter.WarehouseId.Value);
-        }
-
-        if (receiptQueryFilter.ReceiptTypeId.HasValue)
-        {
-            query = query.Where(r => r.ReceiptTypeId == receiptQueryFilter.ReceiptTypeId.Value);
-        }
-
-        if (!string.IsNullOrWhiteSpace(receiptQueryFilter.InvoiceNumber))
-        {
-            query = query.Where(r => r.InvoiceNumber == receiptQueryFilter.InvoiceNumber);
-        }
-
-        var totalRecords = await query.CountAsync();
-
-        var receipts = await query
-            .OrderByDescending(r => r.IssueDate)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
 
         return new ResponseGetObject
         {
             Data = new PagedResult<ReceiptDto>
             {
-                Items = receipts.Select(ToDto),
+                Items = rows,
                 TotalRecords = totalRecords,
                 PageNumber = pageNumber,
                 PageSize = pageSize
@@ -186,8 +210,10 @@ public class ReceiptService : IReceiptService
             ReceiptTypeId = receiptRequestDto.ReceiptTypeId,
             InvoiceNumber = receiptRequestDto.InvoiceNumber,
             Description = receiptRequestDto.Description,
-            IssueDate = DateTime.UtcNow,
-            InvoiceTotal = receiptRequestDto.InvoiceTotal
+            IssueDate = receiptRequestDto.IssueDate ?? DateTime.UtcNow,
+            InvoiceTotal = receiptRequestDto.InvoiceTotal,
+            CreatedAt = DateTime.UtcNow,
+            CreatedById = _currentUserService.AppUserId
         };
 
         await _unitOfWork.Repository<Receipt>().AddAsync(receipt);
@@ -261,17 +287,4 @@ public class ReceiptService : IReceiptService
         stockCache[productId] = stock;
     }
 
-    private static ReceiptDto ToDto(Receipt receipt) => new()
-    {
-        ReceiptId = receipt.ReceiptId,
-        SupplierId = receipt.SupplierId,
-        TaxId = receipt.TaxId,
-        WarehouseId = receipt.WarehouseId,
-        WarehousePeriodId = receipt.WarehousePeriodId,
-        ReceiptTypeId = receipt.ReceiptTypeId,
-        InvoiceNumber = receipt.InvoiceNumber,
-        Description = receipt.Description,
-        IssueDate = receipt.IssueDate,
-        InvoiceTotal = receipt.InvoiceTotal
-    };
 }

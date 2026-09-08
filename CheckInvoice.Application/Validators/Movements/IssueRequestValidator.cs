@@ -28,6 +28,9 @@ public class IssueRequestValidator : AbstractValidator<IssueRequestDto>
             .MaximumLength(20).WithMessage("PaymentType must not exceed 20 characters.")
             .When(x => x.SendToAccountsReceivable);
 
+        RuleFor(x => x.PaymentDetail)
+            .MaximumLength(255).WithMessage("PaymentDetail must not exceed 255 characters.");
+
         RuleForEach(x => x.Details).ChildRules(detail =>
         {
             detail.RuleFor(d => d.ProductId)
