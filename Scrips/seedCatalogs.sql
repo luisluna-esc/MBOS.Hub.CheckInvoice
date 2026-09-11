@@ -39,14 +39,28 @@ INSERT INTO issue_type (name, is_active) VALUES
 ('Salida Normal', TRUE), ('Salida por Regalo', TRUE), ('Salida por Prestamo', TRUE), ('Salida por Merma', TRUE)
 ON CONFLICT DO NOTHING;
 
+-- 'Devolucion' y 'Ajuste' no se ofrecen en el select manual de Entrada (ver
+-- receipt-create.ts, filtro VISIBLE_RECEIPT_TYPE_NAMES) — los crea automáticamente el
+-- apartado de Devoluciones/Ajuste de Inventario, nunca se eligen a mano.
 INSERT INTO receipt_type (name, is_active) VALUES
-('Compra', TRUE), ('Donacion', TRUE), ('Devolucion', TRUE), ('Ajuste', TRUE)
+('Compras con Factura', TRUE), ('Compras con Retencion', TRUE), ('Inventario Inicial', TRUE),
+('Devolucion', TRUE), ('Ajuste', TRUE)
 ON CONFLICT DO NOTHING;
 
+-- "Impresion Rollo" usa el formato de rollo térmico angosto (ver ReportService.isRoll);
+-- cualquier otro tipo, incluyendo "Impresion Hoja", usa página completa.
 INSERT INTO print_type (name) VALUES
-('Factura'), ('Recibo'), ('Nota de Entrega'), ('Sin Impresion')
+('Impresion Hoja'), ('Impresion Rollo'), ('Sin Impresion')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO media_type (name, is_active) VALUES
 ('Libro', TRUE), ('Revista', TRUE), ('Folleto', TRUE), ('DVD', TRUE), ('Multimedia', TRUE)
+ON CONFLICT DO NOTHING;
+
+-- ALMACEN CENTRAL MBOS es el único almacén operativo (donde se registran Entradas, Salidas
+-- y Ajustes); los otros cuatro (uno por cada Misión) solo existen como origen/destino de
+-- Transferencias, por eso los selects de creación de documentos solo deben ofrecer MBOS.
+INSERT INTO warehouse (name, is_active) VALUES
+('ALMACEN CENTRAL MBON', TRUE), ('ALMACEN CENTRAL UB', TRUE), ('ALMACEN CENTRAL MOB', TRUE),
+('ALMACEN CENTRAL MBC', TRUE), ('ALMACEN CENTRAL MBOS', TRUE)
 ON CONFLICT DO NOTHING;

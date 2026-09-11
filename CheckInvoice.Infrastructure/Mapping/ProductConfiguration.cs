@@ -33,10 +33,6 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         entity.Property(e => e.MediaTypeId)
               .HasColumnName("media_type_id");
 
-        entity.Property(e => e.Price)
-              .HasColumnName("price")
-              .HasColumnType("numeric(12,2)");
-
         entity.Property(e => e.IsActive)
               .HasColumnName("is_active");
     }

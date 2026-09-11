@@ -99,14 +99,6 @@ CREATE TABLE province (
     CONSTRAINT uq_province_name UNIQUE (name)
 );
 
-CREATE TABLE warehouse_period (
-    warehouse_period_id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(20) NOT NULL,
-    is_closed BOOLEAN NOT NULL DEFAULT FALSE,
-    closed_at TIMESTAMP,
-    closed_by BIGINT REFERENCES app_user(app_user_id)
-);
-
 CREATE TABLE warehouse (
     warehouse_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -158,6 +150,14 @@ CREATE TABLE app_user (
 -- =====================================================================
 -- LEVEL 3: depend on app_user
 -- =====================================================================
+
+CREATE TABLE warehouse_period (
+    warehouse_period_id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(20) NOT NULL,
+    is_closed BOOLEAN NOT NULL DEFAULT FALSE,
+    closed_at TIMESTAMP,
+    closed_by BIGINT REFERENCES app_user(app_user_id)
+);
 
 CREATE TABLE role (
     role_id BIGSERIAL PRIMARY KEY,
@@ -353,7 +353,6 @@ CREATE TABLE product (
     department_id BIGINT,
     sub_department_id BIGINT,
     media_type_id BIGINT,
-    price NUMERIC(12,2),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT fk_product_department FOREIGN KEY (department_id) REFERENCES department(department_id),
     CONSTRAINT fk_product_sub_department FOREIGN KEY (sub_department_id) REFERENCES sub_department(sub_department_id),
@@ -395,6 +394,7 @@ CREATE TABLE receipt (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     created_by BIGINT,
     is_voided BOOLEAN NOT NULL DEFAULT FALSE,
+    related_issue_id BIGINT, -- Devolución: Entrada que referencia la Salida de origen. FK agregada más abajo, después de CREATE TABLE issue (issue aún no existe en este punto del script).
     CONSTRAINT fk_receipt_supplier FOREIGN KEY (supplier_id) REFERENCES supplier(supplier_id),
     CONSTRAINT fk_receipt_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouse(warehouse_id),
     CONSTRAINT fk_receipt_warehouse_period FOREIGN KEY (warehouse_period_id) REFERENCES warehouse_period(warehouse_period_id),
@@ -430,6 +430,10 @@ CREATE TABLE issue (
 CREATE INDEX idx_issue_warehouse ON issue(warehouse_id);
 CREATE INDEX idx_issue_issue_date ON issue(issue_date);
 CREATE INDEX idx_issue_client ON issue(client_id);
+
+-- Devolución: la Entrada que registra el retorno referencia la Salida de origen.
+ALTER TABLE receipt ADD CONSTRAINT fk_receipt_related_issue FOREIGN KEY (related_issue_id) REFERENCES issue(issue_id);
+CREATE INDEX idx_receipt_related_issue ON receipt(related_issue_id);
 
 CREATE TABLE transfer (
     transfer_id BIGSERIAL PRIMARY KEY,

@@ -60,5 +60,8 @@ public class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
               .IsRequired()
               .HasColumnName("is_voided")
               .HasDefaultValue(false);
+
+        entity.Property(e => e.RelatedIssueId)
+              .HasColumnName("related_issue_id");
     }
 }

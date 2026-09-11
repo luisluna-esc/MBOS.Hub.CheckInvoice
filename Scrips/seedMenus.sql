@@ -110,6 +110,19 @@ INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_or
 ('Anulaciones de Entradas', 'nav.receiptVoidRequests', '/receipts/void-requests', 'void', NULL, 12, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
+-- Ajuste de Inventario: corrección libre de stock (ej. conteo físico), sin referenciar
+-- ninguna Entrada/Salida existente. Internamente crea una Entrada tipo "Ajuste" o una Salida
+-- tipo "Salida por Merma" según el signo de la diferencia, así queda dentro del mismo Kardex.
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
+('Ajuste de Inventario', 'nav.stockAdjustment', '/stock-adjustments', 'adjustment', NULL, 14, TRUE, NULL)
+ON CONFLICT DO NOTHING;
+
+-- Devoluciones: apartado propio (no una acción dentro de Salidas). Se elige la Salida original
+-- y se registra el retorno como Entrada tipo "Devolucion" referenciando esa Salida.
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
+('Devoluciones', 'nav.issueReturns', '/issue-returns', 'return', NULL, 15, TRUE, NULL)
+ON CONFLICT DO NOTHING;
+
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
 ('Cuentas por Cobrar', 'nav.accountReceivables', '/account-receivables', 'receivable', NULL, 9, TRUE, NULL)
 ON CONFLICT DO NOTHING;

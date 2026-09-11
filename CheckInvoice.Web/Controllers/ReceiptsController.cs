@@ -41,4 +41,20 @@ public class ReceiptsController : ControllerBase
         var result = await _receiptService.InsertReceipt(receiptRequestDto);
         return StatusCode((int)result.StatusCode, result);
     }
+
+    [Authorize(Policy = "receipt.view")]
+    [HttpGet("returnable-lines/{issueId}")]
+    public async Task<IActionResult> GetReturnableLines(long issueId)
+    {
+        var result = await _receiptService.GetReturnableIssueLines(issueId);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [Authorize(Policy = "receipt.create")]
+    [HttpPost("returns")]
+    public async Task<IActionResult> InsertReturn([FromBody] ReceiptReturnRequestDto receiptReturnRequestDto)
+    {
+        var result = await _receiptService.InsertReturn(receiptReturnRequestDto);
+        return StatusCode((int)result.StatusCode, result);
+    }
 }

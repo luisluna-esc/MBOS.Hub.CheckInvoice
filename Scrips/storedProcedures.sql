@@ -295,6 +295,7 @@ RETURNS TABLE (
     has_pending_void_request BOOLEAN,
     void_reason_name TEXT,
     void_detail VARCHAR,
+    related_issue_id BIGINT,
     total_records INT
 )
 LANGUAGE sql
@@ -325,6 +326,7 @@ AS $$
         ) AS has_pending_void_request,
         vctx.void_reason_name,
         vctx.detail AS void_detail,
+        r.related_issue_id,
         CAST(COUNT(*) OVER() AS INT) AS total_records
     FROM receipt r
     LEFT JOIN app_user au ON au.app_user_id = r.created_by

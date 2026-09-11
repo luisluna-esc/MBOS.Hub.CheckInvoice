@@ -8,6 +8,5 @@ public class ProductDto
     public long? DepartmentId { get; set; }
     public long? SubDepartmentId { get; set; }
     public long? MediaTypeId { get; set; }
-    public decimal? Price { get; set; }
     public bool IsActive { get; set; }
 }
