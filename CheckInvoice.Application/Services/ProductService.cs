@@ -120,7 +120,6 @@ public class ProductService : IProductService
             DepartmentId = productDto.DepartmentId,
             SubDepartmentId = productDto.SubDepartmentId,
             MediaTypeId = productDto.MediaTypeId,
-            Price = productDto.Price,
             IsActive = productDto.IsActive
         };
 
@@ -178,7 +177,6 @@ public class ProductService : IProductService
         product.DepartmentId = productDto.DepartmentId;
         product.SubDepartmentId = productDto.SubDepartmentId;
         product.MediaTypeId = productDto.MediaTypeId;
-        product.Price = productDto.Price;
         product.IsActive = productDto.IsActive;
 
         repository.Update(product);
@@ -247,7 +245,6 @@ public class ProductService : IProductService
         DepartmentId = product.DepartmentId,
         SubDepartmentId = product.SubDepartmentId,
         MediaTypeId = product.MediaTypeId,
-        Price = product.Price,
         IsActive = product.IsActive
     };
 }

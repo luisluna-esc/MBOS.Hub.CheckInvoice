@@ -36,6 +36,22 @@ WHERE m.route = '/receipts/void-requests'
   AND r.name IN ('Auxiliar Contador', 'Contador', 'M-BOS')
 ON CONFLICT DO NOTHING;
 
+-- Ajuste de Inventario: mismo criterio que Anulaciones (roles con permiso "trabajo").
+INSERT INTO menu_role (menu_id, role_id)
+SELECT m.menu_id, r.role_id
+FROM menu m, role r
+WHERE m.route = '/stock-adjustments'
+  AND r.name IN ('Auxiliar Contador', 'Contador', 'M-BOS')
+ON CONFLICT DO NOTHING;
+
+-- Devoluciones: mismo criterio que Ajuste de Inventario (roles con permiso "trabajo").
+INSERT INTO menu_role (menu_id, role_id)
+SELECT m.menu_id, r.role_id
+FROM menu m, role r
+WHERE m.route = '/issue-returns'
+  AND r.name IN ('Auxiliar Contador', 'Contador', 'M-BOS')
+ON CONFLICT DO NOTHING;
+
 -- Cuentas por Cobrar: gestión de cobranza, no es para Pastor (eso es "Mi Cuenta").
 INSERT INTO menu_role (menu_id, role_id)
 SELECT m.menu_id, r.role_id
@@ -91,6 +107,8 @@ WHERE r.is_active
     'Usuarios', 'Roles', 'Permisos',
     'Anulaciones',
     'Anulaciones de Entradas',
+    'Ajuste de Inventario',
+    'Devoluciones',
     'Cuentas por Cobrar',
     'Mi Cuenta',
     'Reportes', 'Reporte Financiero', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar',

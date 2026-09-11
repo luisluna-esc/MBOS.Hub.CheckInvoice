@@ -26,17 +26,20 @@ public class ReceiptService : IReceiptService
     private readonly IUnitOfWork _unitOfWork;
     private readonly PaginationOptions _paginationOptions;
     private readonly IValidator<ReceiptRequestDto> _validator;
+    private readonly IValidator<ReceiptReturnRequestDto> _returnValidator;
     private readonly ICurrentUserService _currentUserService;
 
     public ReceiptService(
         IUnitOfWork unitOfWork,
         PaginationOptions paginationOptions,
         IValidator<ReceiptRequestDto> validator,
+        IValidator<ReceiptReturnRequestDto> returnValidator,
         ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
         _paginationOptions = paginationOptions;
         _validator = validator;
+        _returnValidator = returnValidator;
         _currentUserService = currentUserService;
     }
 
@@ -63,6 +66,7 @@ public class ReceiptService : IReceiptService
             has_pending_void_request AS "HasPendingVoidRequest",
             void_reason_name AS "VoidReasonName",
             void_detail AS "VoidDetail",
+            related_issue_id AS "RelatedIssueId",
             total_records AS "TotalRecords"
         FROM sp_get_receipts({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::varchar, {5}::int, {6}::int)
         """;
@@ -247,6 +251,187 @@ public class ReceiptService : IReceiptService
             Messages = [new Message { Type = MessageType.Success, Description = "Receipt created successfully." }],
             StatusCode = HttpStatusCode.Created
         };
+    }
+
+    public async Task<ResponseGetObject> GetReturnableIssueLines(long issueId)
+    {
+        var issue = await _unitOfWork.Repository<Issue>().GetByIdAsync(issueId);
+        if (issue is null || issue.IsVoided)
+        {
+            return new ResponseGetObject
+            {
+                Data = new(),
+                Messages = [new Message { Type = MessageType.Error, Description = "Issue not found or voided." }],
+                StatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        var issueDetails = await _unitOfWork.Repository<IssueDetail>().Query()
+            .Where(d => d.IssueId == issueId)
+            .ToListAsync();
+
+        var alreadyReturnedByProduct = await GetAlreadyReturnedByProduct(issueId);
+
+        return new ResponseGetObject
+        {
+            Data = issueDetails.Select(d =>
+            {
+                var alreadyReturned = alreadyReturnedByProduct.GetValueOrDefault(d.ProductId, 0m);
+                return new ReturnableIssueLineDto
+                {
+                    ProductId = d.ProductId,
+                    QuantityIssued = d.Quantity,
+                    QuantityAlreadyReturned = alreadyReturned,
+                    QuantityReturnable = d.Quantity - alreadyReturned,
+                    UnitCost = d.UnitCost
+                };
+            }),
+            Messages = [],
+            StatusCode = HttpStatusCode.OK
+        };
+    }
+
+    public async Task<ResponsePost> InsertReturn(ReceiptReturnRequestDto receiptReturnRequestDto)
+    {
+        var validationResult = await _returnValidator.ValidateAsync(receiptReturnRequestDto);
+        var errors = validationResult.Errors
+            .Select(e => new Message { Type = MessageType.Error, Description = e.ErrorMessage })
+            .ToList();
+
+        if (errors.Count > 0)
+        {
+            return new ResponsePost
+            {
+                Id = 0,
+                Messages = errors.ToArray(),
+                StatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
+        var issue = await _unitOfWork.Repository<Issue>().GetByIdAsync(receiptReturnRequestDto.IssueId);
+        if (issue is null || issue.IsVoided)
+        {
+            errors.Add(new Message { Type = MessageType.Error, Description = "IssueId does not reference an existing, non-voided issue." });
+            return new ResponsePost { Id = 0, Messages = errors.ToArray(), StatusCode = HttpStatusCode.BadRequest };
+        }
+
+        if (issue.WarehouseId is null)
+        {
+            errors.Add(new Message { Type = MessageType.Error, Description = "The original issue has no warehouse assigned." });
+            return new ResponsePost { Id = 0, Messages = errors.ToArray(), StatusCode = HttpStatusCode.BadRequest };
+        }
+
+        if (!await _unitOfWork.Repository<ReceiptType>().Query().AnyAsync(r => r.ReceiptTypeId == receiptReturnRequestDto.ReceiptTypeId))
+        {
+            errors.Add(new Message { Type = MessageType.Error, Description = "ReceiptTypeId does not reference an existing receipt type." });
+        }
+
+        var issueDetails = await _unitOfWork.Repository<IssueDetail>().Query()
+            .Where(d => d.IssueId == issue.IssueId)
+            .ToListAsync();
+
+        // Agrupado por si la Salida original tuviera más de una línea para el mismo
+        // producto — evita una excepción de clave duplicada al construir el diccionario.
+        var issueDetailsByProduct = issueDetails
+            .GroupBy(d => d.ProductId)
+            .ToDictionary(g => g.Key, g => (Quantity: g.Sum(d => d.Quantity), UnitCost: g.First().UnitCost));
+
+        var alreadyReturnedByProduct = await GetAlreadyReturnedByProduct(issue.IssueId);
+
+        foreach (var line in receiptReturnRequestDto.Lines)
+        {
+            if (!issueDetailsByProduct.TryGetValue(line.ProductId, out var issueDetail))
+            {
+                errors.Add(new Message { Type = MessageType.Error, Description = $"ProductId {line.ProductId} was not part of the original issue." });
+                continue;
+            }
+
+            var alreadyReturned = alreadyReturnedByProduct.GetValueOrDefault(line.ProductId, 0m);
+            var returnable = issueDetail.Quantity - alreadyReturned;
+
+            if (line.Quantity > returnable)
+            {
+                errors.Add(new Message { Type = MessageType.Error, Description = $"ProductId {line.ProductId}: cannot return {line.Quantity}, only {returnable} remain returnable." });
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            return new ResponsePost
+            {
+                Id = 0,
+                Messages = errors.ToArray(),
+                StatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
+        var warehouseId = issue.WarehouseId.Value;
+
+        var receipt = new Receipt
+        {
+            WarehouseId = warehouseId,
+            ReceiptTypeId = receiptReturnRequestDto.ReceiptTypeId,
+            Description = receiptReturnRequestDto.Description,
+            IssueDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            CreatedById = _currentUserService.AppUserId,
+            RelatedIssueId = issue.IssueId
+        };
+
+        await _unitOfWork.Repository<Receipt>().AddAsync(receipt);
+        await _unitOfWork.SaveChangesAsync();
+
+        var stockCache = new Dictionary<long, Stock>();
+
+        foreach (var line in receiptReturnRequestDto.Lines)
+        {
+            var unitCost = issueDetailsByProduct[line.ProductId].UnitCost;
+            var totalCost = line.Quantity * unitCost;
+
+            await _unitOfWork.Repository<ReceiptDetail>().AddAsync(new ReceiptDetail
+            {
+                ReceiptId = receipt.ReceiptId,
+                ProductId = line.ProductId,
+                Quantity = line.Quantity,
+                UnitCost = unitCost,
+                TotalCost = totalCost
+            });
+
+            await IncreaseStock(stockCache, warehouseId, line.ProductId, line.Quantity, unitCost);
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+
+        return new ResponsePost
+        {
+            Id = receipt.ReceiptId,
+            Messages = [new Message { Type = MessageType.Success, Description = "Return registered successfully." }],
+            StatusCode = HttpStatusCode.Created
+        };
+    }
+
+    // Cuánto ya se ha devuelto de esta Salida por producto, sumando todas las Entradas de
+    // tipo Devolución (RelatedIssueId == issueId) que no estén anuladas — usado tanto para
+    // mostrar lo devolvible como para impedir devolver más de lo que salió. Sin propiedades
+    // de navegación en este modelo (ver ReceiptDetail.cs/ReceiptConfiguration.cs), el cruce
+    // Receipt->ReceiptDetail se hace por ReceiptId, no por join de EF.
+    private async Task<Dictionary<long, decimal>> GetAlreadyReturnedByProduct(long issueId)
+    {
+        var returnReceiptIds = await _unitOfWork.Repository<Receipt>().Query()
+            .Where(r => r.RelatedIssueId == issueId && !r.IsVoided)
+            .Select(r => r.ReceiptId)
+            .ToListAsync();
+
+        if (returnReceiptIds.Count == 0)
+        {
+            return new Dictionary<long, decimal>();
+        }
+
+        return await _unitOfWork.Repository<ReceiptDetail>().Query()
+            .Where(d => returnReceiptIds.Contains(d.ReceiptId))
+            .GroupBy(d => d.ProductId)
+            .Select(g => new { ProductId = g.Key, Total = g.Sum(d => d.Quantity) })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Total);
     }
 
     // Reuses a per-request in-memory cache so multiple lines for the same product

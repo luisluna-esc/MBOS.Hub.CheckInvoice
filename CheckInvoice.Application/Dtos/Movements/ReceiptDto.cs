@@ -20,4 +20,5 @@ public class ReceiptDto
     public bool HasPendingVoidRequest { get; set; }
     public string? VoidReasonName { get; set; }
     public string? VoidDetail { get; set; }
+    public long? RelatedIssueId { get; set; }
 }

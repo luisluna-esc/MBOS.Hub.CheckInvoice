@@ -15,4 +15,5 @@ public class Receipt
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public long? CreatedById { get; set; }
     public bool IsVoided { get; set; }
+    public long? RelatedIssueId { get; set; }
 }

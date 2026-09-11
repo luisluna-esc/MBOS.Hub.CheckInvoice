@@ -1633,13 +1633,12 @@ public class ReportService : IReportService
 
         var total = lines.Sum(l => l.TotalCost);
 
-        // "Factura" y "Recibo" se imprimen en rollo térmico angosto (como ya se hace en el
-        // negocio con ventas al contado) — "Nota de Entrega" y cualquier otro tipo usan el
-        // formato de página completa. Por decisión explícita del cliente, el rollo NO incluye
+        // "Impresion Rollo" se imprime en rollo térmico angosto (como ya se hace en el negocio
+        // con ventas al contado) — cualquier otro tipo ("Impresion Hoja", etc.) usa el formato
+        // de página completa. Por decisión explícita del cliente, el rollo NO incluye
         // NIT/N° Autorización/Código de Control: esos son datos de facturación fiscal oficial
         // (SIN) que este sistema no gestiona, y no deben inventarse.
-        var isRoll = printTypeName.Equals("Factura", StringComparison.OrdinalIgnoreCase)
-            || printTypeName.Equals("Recibo", StringComparison.OrdinalIgnoreCase);
+        var isRoll = printTypeName.Equals("Impresion Rollo", StringComparison.OrdinalIgnoreCase);
 
         var document = isRoll
             ? BuildIssueVoucherRollDocument(issueId, printTypeName, issue, lines, total, warehouseName, clientName, username)
@@ -1780,7 +1779,7 @@ public class ReportService : IReportService
         });
     }
 
-    // Rollo térmico angosto (80mm) para "Factura"/"Recibo" — solo el estilo visual del ejemplo
+    // Rollo térmico angosto (80mm) para "Impresion Rollo" — solo el estilo visual del ejemplo
     // en papel que ya usa el negocio, sin los campos de facturación fiscal oficial (NIT propio,
     // N° Autorización, Código de Control) que ese ejemplo tenía, porque este sistema no emite
     // facturas fiscales reales ante el SIN.
