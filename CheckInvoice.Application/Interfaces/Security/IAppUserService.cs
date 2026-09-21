@@ -11,4 +11,5 @@ public interface IAppUserService
     Task<ResponsePost> InsertAppUser(AppUserDto appUserDto);
     Task<ResponsePost> UpdateAppUser(long id, AppUserDto appUserDto);
     Task<ResponsePost> DeleteAppUser(long id);
+    Task<ResponsePost> SetPassword(long id, string newPassword);
 }

@@ -241,6 +241,35 @@ public class AppUserService : IAppUserService
         };
     }
 
+    public async Task<ResponsePost> SetPassword(long id, string newPassword)
+    {
+        var repository = _unitOfWork.Repository<AppUser>();
+        var appUser = await repository.GetByIdAsync(id);
+
+        if (appUser is null)
+        {
+            return new ResponsePost
+            {
+                Id = id,
+                Messages = [new Message { Type = MessageType.Error, Description = "User not found." }],
+                StatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        appUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        appUser.UpdatedAt = DateTime.UtcNow;
+
+        repository.Update(appUser);
+        await _unitOfWork.SaveChangesAsync();
+
+        return new ResponsePost
+        {
+            Id = appUser.AppUserId,
+            Messages = [new Message { Type = MessageType.Success, Description = "Password updated successfully." }],
+            StatusCode = HttpStatusCode.OK
+        };
+    }
+
     private static AppUserDto ToDto(AppUser appUser) => new()
     {
         AppUserId = appUser.AppUserId,

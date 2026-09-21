@@ -57,4 +57,12 @@ public class ClientsController : ControllerBase
         var result = await _clientService.GrantPortalAccess(id);
         return StatusCode((int)result.StatusCode, result);
     }
+
+    [Authorize(Policy = "client.manage")]
+    [HttpPost("{id}/reset-portal-password")]
+    public async Task<IActionResult> ResetPortalPassword(long id)
+    {
+        var result = await _clientService.ResetPortalPassword(id);
+        return StatusCode((int)result.StatusCode, result);
+    }
 }

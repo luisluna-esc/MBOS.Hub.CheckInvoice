@@ -432,6 +432,62 @@ public class ClientService : IClientService
         };
     }
 
+    public async Task<ResponseGetObject> ResetPortalPassword(long id)
+    {
+        var clientRepository = _unitOfWork.Repository<Client>();
+        var client = await clientRepository.GetByIdAsync(id);
+
+        if (client is null)
+        {
+            return new ResponseGetObject
+            {
+                Data = new(),
+                Messages = [new Message { Type = MessageType.Error, Description = "Client not found." }],
+                StatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        if (!client.IsPastor)
+        {
+            return new ResponseGetObject
+            {
+                Data = new(),
+                Messages = [new Message { Type = MessageType.Error, Description = "This client is not marked as Pastor." }],
+                StatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
+        if (!client.AppUserId.HasValue)
+        {
+            return new ResponseGetObject
+            {
+                Data = new(),
+                Messages = [new Message { Type = MessageType.Error, Description = "This client does not have portal access yet." }],
+                StatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
+        var temporaryPassword = GenerateTemporaryPassword();
+        var setPasswordResult = await _appUserService.SetPassword(client.AppUserId.Value, temporaryPassword);
+
+        if (setPasswordResult.StatusCode != HttpStatusCode.OK)
+        {
+            return new ResponseGetObject
+            {
+                Data = new(),
+                Messages = setPasswordResult.Messages,
+                StatusCode = setPasswordResult.StatusCode
+            };
+        }
+
+        return new ResponseGetObject
+        {
+            Data = new { AppUserId = client.AppUserId.Value, TemporaryPassword = temporaryPassword },
+            Messages = [new Message { Type = MessageType.Success, Description = "Password reset successfully." }],
+            StatusCode = HttpStatusCode.OK
+        };
+    }
+
     private static string GenerateTemporaryPassword()
     {
         const string chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";

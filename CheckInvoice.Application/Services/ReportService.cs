@@ -2598,6 +2598,8 @@ public class ReportService : IReportService
             issue_date AS "IssueDate",
             client_id AS "ClientId",
             client_name AS "ClientName",
+            product_count AS "ProductCount",
+            product_names AS "ProductNames",
             total_amount AS "TotalAmount",
             outstanding_balance AS "OutstandingBalance",
             due_date AS "DueDate",
@@ -2662,7 +2664,7 @@ public class ReportService : IReportService
         {
             container.Page(page =>
             {
-                page.Size(PageSizes.Letter);
+                page.Size(PageSizes.Letter.Landscape());
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontSize(9));
 
@@ -2693,13 +2695,14 @@ public class ReportService : IReportService
                     {
                         table.ColumnsDefinition(columns =>
                         {
-                            columns.RelativeColumn(2.2f);
+                            columns.RelativeColumn(1.8f);
+                            columns.RelativeColumn(0.9f);
+                            columns.RelativeColumn(1);
+                            columns.RelativeColumn(1);
+                            columns.RelativeColumn(2.4f);
                             columns.RelativeColumn(1);
                             columns.RelativeColumn(1.1f);
-                            columns.RelativeColumn(1.1f);
-                            columns.RelativeColumn(1.1f);
-                            columns.RelativeColumn(1.2f);
-                            columns.RelativeColumn(1);
+                            columns.RelativeColumn(0.9f);
                         });
 
                         table.Header(header =>
@@ -2708,6 +2711,7 @@ public class ReportService : IReportService
                             header.Cell().Element(HeaderCell).Text("N° Salida");
                             header.Cell().Element(HeaderCell).Text("Fecha");
                             header.Cell().Element(HeaderCell).Text("Fecha\nLímite");
+                            header.Cell().Element(HeaderCell).Text("Productos");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Total");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Saldo\nPendiente");
                             header.Cell().Element(HeaderCell).AlignCenter().Text("Estado");
@@ -2719,12 +2723,13 @@ public class ReportService : IReportService
                             table.Cell().Element(BodyCell).Text(row.IssueId.HasValue ? row.IssueId.Value.ToString().PadLeft(5, '0') : "—");
                             table.Cell().Element(BodyCell).Text(row.IssueDate.HasValue ? row.IssueDate.Value.ToString("dd/MM/yyyy") : "—");
                             table.Cell().Element(BodyCell).Text(row.DueDate.HasValue ? row.DueDate.Value.ToString("dd/MM/yyyy") : "—");
+                            table.Cell().Element(BodyCell).Text(row.ProductNames ?? "—");
                             table.Cell().Element(BodyCell).AlignRight().Text(row.TotalAmount.ToString("N2", ReportCulture));
                             table.Cell().Element(BodyCell).AlignRight().Text(row.OutstandingBalance.ToString("N2", ReportCulture));
                             table.Cell().Element(BodyCell).AlignCenter().Text(row.Status == "paid" ? "Pagado" : "Pendiente");
                         }
 
-                        table.Cell().ColumnSpan(4).Element(CategoryTotalCell).AlignRight().Text("Total Cartera").Bold();
+                        table.Cell().ColumnSpan(5).Element(CategoryTotalCell).AlignRight().Text("Total Cartera").Bold();
                         table.Cell().Element(CategoryTotalCell).AlignRight().Text(totalPortfolio.ToString("N2", ReportCulture)).Bold();
                         table.Cell().Element(CategoryTotalCell).AlignRight().Text(totalOutstanding.ToString("N2", ReportCulture)).Bold();
                         table.Cell().Element(CategoryTotalCell).Text("");

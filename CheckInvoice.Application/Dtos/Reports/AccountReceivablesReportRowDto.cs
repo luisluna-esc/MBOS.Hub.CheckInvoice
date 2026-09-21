@@ -7,6 +7,8 @@ public class AccountReceivablesReportRowDto
     public DateTime? IssueDate { get; set; }
     public long? ClientId { get; set; }
     public string? ClientName { get; set; }
+    public int ProductCount { get; set; }
+    public string? ProductNames { get; set; }
     public decimal TotalAmount { get; set; }
     public decimal OutstandingBalance { get; set; }
     public DateOnly? DueDate { get; set; }

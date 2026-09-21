@@ -42,6 +42,16 @@ FROM menu m
 WHERE m.name = 'Catálogos' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
+-- Pastores: catálogo aparte de Clientes (aunque son clientes con is_pastor=TRUE) porque su
+-- gestión es distinta: además de editar el registro, aquí se otorga/reinicia el acceso al
+-- portal (usuario y contraseña). No es autoservicio (eso es "Mi Cuenta"), es la vista de
+-- administración para quien gestiona a los pastores.
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Pastores', 'nav.pastors', '/catalogs/pastors', 'client', m.menu_id, 4, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Catálogos' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
+
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
 ('Transferencias', 'nav.transfers', NULL, 'transfer', NULL, 5, TRUE, NULL)
 ON CONFLICT DO NOTHING;

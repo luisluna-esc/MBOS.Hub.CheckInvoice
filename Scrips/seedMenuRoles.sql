@@ -60,6 +60,15 @@ WHERE m.route = '/account-receivables'
   AND r.name IN ('Auxiliar Contador', 'Contador', 'Tesorero', 'M-BOS')
 ON CONFLICT DO NOTHING;
 
+-- Pastores: gestión administrativa (edición, otorgar/resetear acceso al portal), no es para
+-- Pastor (eso es "Mi Cuenta"). Mismo criterio que Cuentas por Cobrar.
+INSERT INTO menu_role (menu_id, role_id)
+SELECT m.menu_id, r.role_id
+FROM menu m, role r
+WHERE m.route = '/catalogs/pastors'
+  AND r.name IN ('Auxiliar Contador', 'Contador', 'Tesorero', 'M-BOS')
+ON CONFLICT DO NOTHING;
+
 -- Mi Cuenta: autoservicio, solo Pastor.
 INSERT INTO menu_role (menu_id, role_id)
 SELECT m.menu_id, r.role_id
@@ -110,6 +119,7 @@ WHERE r.is_active
     'Ajuste de Inventario',
     'Devoluciones',
     'Cuentas por Cobrar',
+    'Pastores',
     'Mi Cuenta',
     'Reportes', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar',
     'Configuración del Sistema', 'Países', 'Tipos de Documento', 'Tipos de Iglesia', 'Tipos de Impresión',
