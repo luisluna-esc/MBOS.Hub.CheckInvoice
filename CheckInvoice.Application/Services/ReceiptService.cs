@@ -68,7 +68,7 @@ public class ReceiptService : IReceiptService
             void_detail AS "VoidDetail",
             related_issue_id AS "RelatedIssueId",
             total_records AS "TotalRecords"
-        FROM sp_get_receipts({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::varchar, {5}::int, {6}::int)
+        FROM sp_get_receipts({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::varchar, {5}::int, {6}::int, {7}::varchar)
         """;
 
     public async Task<ResponseGetObject> GetAllReceipts(PaginationQueryFilter paginationQueryFilter, ReceiptQueryFilter receiptQueryFilter)
@@ -87,7 +87,8 @@ public class ReceiptService : IReceiptService
             (object?)receiptQueryFilter.ReceiptTypeId ?? DBNull.Value,
             (object?)receiptQueryFilter.InvoiceNumber ?? DBNull.Value,
             pageNumber,
-            pageSize);
+            pageSize,
+            (object?)receiptQueryFilter.SupplierName ?? DBNull.Value);
 
         var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
 

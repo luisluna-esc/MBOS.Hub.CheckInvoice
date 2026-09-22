@@ -54,7 +54,7 @@ public class AccountReceivableService : IAccountReceivableService
             created_at AS "CreatedAt",
             created_by_id AS "CreatedById",
             total_records AS "TotalRecords"
-        FROM sp_get_account_receivables({0}::bigint, {1}::bigint, {2}::varchar, {3}::varchar, {4}::int, {5}::int)
+        FROM sp_get_account_receivables({0}::bigint, {1}::bigint, {2}::varchar, {3}::varchar, {4}::int, {5}::int, {6}::varchar)
         """;
 
     public async Task<ResponseGetObject> GetAllAccountReceivables(PaginationQueryFilter paginationQueryFilter, AccountReceivableQueryFilter accountReceivableQueryFilter)
@@ -72,7 +72,8 @@ public class AccountReceivableService : IAccountReceivableService
             (object?)accountReceivableQueryFilter.PaymentType ?? DBNull.Value,
             (object?)accountReceivableQueryFilter.Status ?? DBNull.Value,
             pageNumber,
-            pageSize);
+            pageSize,
+            (object?)accountReceivableQueryFilter.ClientName ?? DBNull.Value);
 
         var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
 

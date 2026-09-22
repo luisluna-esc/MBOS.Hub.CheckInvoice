@@ -65,7 +65,7 @@ public class IssueService : IIssueService
             void_reason_name AS "VoidReasonName",
             void_detail AS "VoidDetail",
             total_records AS "TotalRecords"
-        FROM sp_get_issues({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::int, {5}::int)
+        FROM sp_get_issues({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::int, {5}::int, {6}::varchar)
         """;
 
     public async Task<ResponseGetObject> GetAllIssues(PaginationQueryFilter paginationQueryFilter, IssueQueryFilter issueQueryFilter)
@@ -84,7 +84,8 @@ public class IssueService : IIssueService
             (object?)issueQueryFilter.WarehouseId ?? DBNull.Value,
             (object?)issueQueryFilter.IssueTypeId ?? DBNull.Value,
             pageNumber,
-            pageSize);
+            pageSize,
+            (object?)issueQueryFilter.ClientName ?? DBNull.Value);
 
         var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
 

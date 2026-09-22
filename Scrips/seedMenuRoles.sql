@@ -97,7 +97,7 @@ FROM menu m, role r
 WHERE m.name IN (
     'Configuración del Sistema', 'Países', 'Tipos de Documento', 'Tipos de Iglesia', 'Tipos de Impresión',
     'Tipos de Salida', 'Tipos de Entrada', 'Tipos de Medio', 'Departamentos', 'Subdepartamentos',
-    'Misiones', 'Provincias', 'Casos Especiales', 'Motivos de Anulación', 'Almacenes'
+    'Misiones', 'Provincias', 'Casos Especiales', 'Motivos de Anulación', 'Almacenes', 'Períodos de Almacén'
   )
   AND r.name = 'M-BOS'
 ON CONFLICT DO NOTHING;
@@ -124,6 +124,6 @@ WHERE r.is_active
     'Reportes', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar',
     'Configuración del Sistema', 'Países', 'Tipos de Documento', 'Tipos de Iglesia', 'Tipos de Impresión',
     'Tipos de Salida', 'Tipos de Entrada', 'Tipos de Medio', 'Departamentos', 'Subdepartamentos',
-    'Misiones', 'Provincias', 'Casos Especiales', 'Motivos de Anulación', 'Almacenes'
+    'Misiones', 'Provincias', 'Casos Especiales', 'Motivos de Anulación', 'Almacenes', 'Períodos de Almacén'
   )
 ON CONFLICT DO NOTHING;

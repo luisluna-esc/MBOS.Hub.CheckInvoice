@@ -7,13 +7,15 @@
 -- por una sola consulta con joins.
 -- =====================================================================
 
+DROP FUNCTION IF EXISTS sp_get_issues(BIGINT, BIGINT, BIGINT, BIGINT, INT, INT);
 CREATE OR REPLACE FUNCTION sp_get_issues(
     p_issue_id BIGINT,
     p_client_id BIGINT,
     p_warehouse_id BIGINT,
     p_issue_type_id BIGINT,
     p_page_number INT,
-    p_page_size INT
+    p_page_size INT,
+    p_client_name VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     issue_id BIGINT,
@@ -67,6 +69,8 @@ AS $$
         CAST(COUNT(*) OVER() AS INT) AS total_records
     FROM issue i
     LEFT JOIN app_user au ON au.app_user_id = i.created_by
+    LEFT JOIN client c ON c.client_id = i.client_id
+    LEFT JOIN party cp ON cp.party_id = c.party_id
     LEFT JOIN LATERAL (
         SELECT SUM(d.total_cost) AS total
         FROM issue_detail d
@@ -86,19 +90,22 @@ AS $$
       AND (p_client_id IS NULL OR i.client_id = p_client_id)
       AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
       AND (p_issue_type_id IS NULL OR i.issue_type_id = p_issue_type_id)
+      AND (p_client_name IS NULL OR cp.name ILIKE '%' || p_client_name || '%')
     ORDER BY i.issue_date DESC
     LIMIT p_page_size OFFSET (p_page_number - 1) * p_page_size;
 $$;
 
 -- Piloto 2: AccountReceivableService.GetAllAccountReceivables hacía 2 consultas
 -- separadas (página + fecha de la salida vinculada). Ahora es una sola con LEFT JOIN.
+DROP FUNCTION IF EXISTS sp_get_account_receivables(BIGINT, BIGINT, VARCHAR, VARCHAR, INT, INT);
 CREATE OR REPLACE FUNCTION sp_get_account_receivables(
     p_account_receivable_id BIGINT,
     p_client_id BIGINT,
     p_payment_type VARCHAR,
     p_status VARCHAR,
     p_page_number INT,
-    p_page_size INT
+    p_page_size INT,
+    p_client_name VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     account_receivable_id BIGINT,
@@ -134,10 +141,13 @@ AS $$
         CAST(COUNT(*) OVER() AS INT) AS total_records
     FROM account_receivable a
     LEFT JOIN issue i ON i.issue_id = a.issue_id
+    LEFT JOIN client c ON c.client_id = a.client_id
+    LEFT JOIN party p ON p.party_id = c.party_id
     WHERE (p_account_receivable_id IS NULL OR a.account_receivable_id = p_account_receivable_id)
       AND (p_client_id IS NULL OR a.client_id = p_client_id)
       AND (p_payment_type IS NULL OR a.payment_type = p_payment_type)
       AND (p_status IS NULL OR a.status = p_status)
+      AND (p_client_name IS NULL OR p.name ILIKE '%' || p_client_name || '%')
     ORDER BY a.created_at DESC
     LIMIT p_page_size OFFSET (p_page_number - 1) * p_page_size;
 $$;
@@ -280,6 +290,7 @@ $$;
 -- nombre del creador, cambios pendientes). Ahora es una sola con LEFT JOIN, igual patrón
 -- que sp_get_issues (Salidas es prácticamente el mismo flujo del lado de entrada).
 DROP FUNCTION IF EXISTS sp_get_receipts(BIGINT, BIGINT, BIGINT, BIGINT, VARCHAR, INT, INT);
+DROP FUNCTION IF EXISTS sp_get_receipts(BIGINT, BIGINT, BIGINT, BIGINT, VARCHAR, INT, INT, VARCHAR);
 CREATE OR REPLACE FUNCTION sp_get_receipts(
     p_receipt_id BIGINT,
     p_supplier_id BIGINT,
@@ -287,7 +298,8 @@ CREATE OR REPLACE FUNCTION sp_get_receipts(
     p_receipt_type_id BIGINT,
     p_invoice_number VARCHAR,
     p_page_number INT,
-    p_page_size INT
+    p_page_size INT,
+    p_supplier_name VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     receipt_id BIGINT,
@@ -343,6 +355,8 @@ AS $$
         CAST(COUNT(*) OVER() AS INT) AS total_records
     FROM receipt r
     LEFT JOIN app_user au ON au.app_user_id = r.created_by
+    LEFT JOIN supplier s ON s.supplier_id = r.supplier_id
+    LEFT JOIN party sp ON sp.party_id = s.party_id
     LEFT JOIN LATERAL (
         -- Más reciente de las anulaciones pendientes/aprobadas de esta entrada.
         SELECT vr2.detail, vru.name AS void_reason_name
@@ -357,6 +371,7 @@ AS $$
       AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
       AND (p_receipt_type_id IS NULL OR r.receipt_type_id = p_receipt_type_id)
       AND (p_invoice_number IS NULL OR r.invoice_number = p_invoice_number)
+      AND (p_supplier_name IS NULL OR sp.name ILIKE '%' || p_supplier_name || '%')
     ORDER BY r.issue_date DESC
     LIMIT p_page_size OFFSET (p_page_number - 1) * p_page_size;
 $$;

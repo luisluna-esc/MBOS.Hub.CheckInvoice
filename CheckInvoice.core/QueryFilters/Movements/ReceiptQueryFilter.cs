@@ -7,4 +7,5 @@ public class ReceiptQueryFilter
     public long? WarehouseId { get; set; }
     public long? ReceiptTypeId { get; set; }
     public string? InvoiceNumber { get; set; }
+    public string? SupplierName { get; set; }
 }

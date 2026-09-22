@@ -6,4 +6,5 @@ public class IssueQueryFilter
     public long? ClientId { get; set; }
     public long? WarehouseId { get; set; }
     public long? IssueTypeId { get; set; }
+    public string? ClientName { get; set; }
 }

@@ -6,4 +6,5 @@ public class AccountReceivableQueryFilter
     public long? ClientId { get; set; }
     public string? PaymentType { get; set; }
     public string? Status { get; set; }
+    public string? ClientName { get; set; }
 }

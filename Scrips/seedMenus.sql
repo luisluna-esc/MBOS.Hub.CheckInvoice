@@ -293,3 +293,9 @@ SELECT 'Almacenes', 'nav.settingsWarehouses', '/admin/lookup/warehouses', NULL, 
 FROM menu m
 WHERE m.name = 'Configuración del Sistema' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
+
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Períodos de Almacén', 'nav.settingsWarehousePeriods', '/admin/lookup/warehouse-periods', NULL, m.menu_id, 15, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Configuración del Sistema' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
