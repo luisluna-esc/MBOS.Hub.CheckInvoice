@@ -237,6 +237,15 @@ public class SupplierService : ISupplierService
         };
     }
 
+    // Misma regla que SupplierValidator.IsTaxIdUniqueAsync (NIT único a nivel de Party), expuesta
+    // como consulta aparte para que el formulario avise al perder el foco en vez de solo al guardar.
+    public async Task<bool> IsTaxIdAvailableAsync(string taxId, long? excludePartyId)
+    {
+        var exclude = excludePartyId ?? 0;
+        return await _unitOfWork.Repository<Party>().Query()
+            .AllAsync(p => p.PartyId == exclude || p.TaxId != taxId);
+    }
+
     public async Task<ResponsePost> DeleteSupplier(long id)
     {
         var repository = _unitOfWork.Repository<Supplier>();

@@ -27,6 +27,19 @@ public class SuppliersController : ControllerBase
     }
 
     [Authorize(Policy = "supplier.manage")]
+    [HttpGet("check-taxid")]
+    public async Task<IActionResult> CheckTaxId([FromQuery] string taxId, [FromQuery] long? excludePartyId)
+    {
+        if (string.IsNullOrWhiteSpace(taxId))
+        {
+            return Ok(new { available = true });
+        }
+
+        var available = await _supplierService.IsTaxIdAvailableAsync(taxId, excludePartyId);
+        return Ok(new { available });
+    }
+
+    [Authorize(Policy = "supplier.manage")]
     [HttpPost]
     public async Task<IActionResult> Insert([FromBody] SupplierDto supplierDto)
     {

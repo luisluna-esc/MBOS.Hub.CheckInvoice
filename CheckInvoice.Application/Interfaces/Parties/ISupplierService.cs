@@ -11,4 +11,5 @@ public interface ISupplierService
     Task<ResponsePost> InsertSupplier(SupplierDto supplierDto);
     Task<ResponsePost> UpdateSupplier(long id, SupplierDto supplierDto);
     Task<ResponsePost> DeleteSupplier(long id);
+    Task<bool> IsTaxIdAvailableAsync(string taxId, long? excludePartyId);
 }
