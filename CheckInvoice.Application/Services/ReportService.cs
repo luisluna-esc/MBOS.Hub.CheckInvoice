@@ -2760,6 +2760,246 @@ public class ReportService : IReportService
         return document.GeneratePdf();
     }
 
+    // Comprobante de una sola Cuenta por Cobrar (a diferencia del reporte general de arriba,
+    // que lista varias). La Cuenta por Cobrar no tiene líneas propias: reutiliza las de la
+    // Salida vinculada (mismo query que el comprobante de Salida) para mostrar código y
+    // nombre de cada producto que se está cobrando, y agrega el historial de pagos.
+    public async Task<byte[]?> GenerateAccountReceivableVoucherPdf(long accountReceivableId)
+    {
+        QuestPDF.Settings.License = LicenseType.Community;
+
+        var accountReceivable = await _unitOfWork.Repository<AccountReceivable>().GetByIdAsync(accountReceivableId);
+        if (accountReceivable is null)
+        {
+            return null;
+        }
+
+        var lines = accountReceivable.IssueId.HasValue
+            ? await _unitOfWork.SqlQueryAsync<IssueVoucherLineDto>(GetIssueVoucherLinesSql, accountReceivable.IssueId.Value)
+            : [];
+
+        Issue? issue = accountReceivable.IssueId.HasValue
+            ? await _unitOfWork.Repository<Issue>().GetByIdAsync(accountReceivable.IssueId.Value)
+            : null;
+
+        var clientName = "—";
+        if (accountReceivable.ClientId.HasValue)
+        {
+            var client = await _unitOfWork.Repository<Client>().GetByIdAsync(accountReceivable.ClientId.Value);
+            if (client is not null)
+            {
+                var party = await _unitOfWork.Repository<Party>().GetByIdAsync(client.PartyId);
+                clientName = party?.Name ?? clientName;
+            }
+        }
+
+        var payments = await _unitOfWork.Repository<Payment>().Query()
+            .Where(p => p.AccountReceivableId == accountReceivableId)
+            .OrderBy(p => p.PaymentDate)
+            .ToListAsync();
+
+        var username = "—";
+        if (_currentUserService.AppUserId.HasValue)
+        {
+            var user = await _unitOfWork.Repository<AppUser>().GetByIdAsync(_currentUserService.AppUserId.Value);
+            username = user?.Username ?? username;
+        }
+
+        var productsTotal = lines.Sum(l => l.TotalCost);
+
+        var paymentTypeLabel = accountReceivable.PaymentType switch
+        {
+            "cash" => "Al contado",
+            "credit" => "Crédito",
+            "installments" => "A cuotas",
+            _ => accountReceivable.PaymentType
+        };
+
+        var statusLabel = accountReceivable.Status == "paid" ? "Pagado" : "Pendiente";
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.Letter);
+                page.Margin(30);
+                page.DefaultTextStyle(x => x.FontSize(9));
+
+                page.Header().Column(column =>
+                {
+                    column.Item().Row(row =>
+                    {
+                        row.Spacing(12);
+                        row.ConstantItem(65).Height(48).Image(GetLogoBytes()).FitArea();
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(10);
+                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(10);
+                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(10);
+                        });
+                        row.ConstantItem(110).Height(48).Border(1).BorderColor(Colors.Grey.Darken1).Padding(6).Column(c =>
+                        {
+                            c.Item().AlignCenter().Text("N° CUENTA").FontSize(7).FontColor(Colors.Grey.Darken2);
+                            c.Item().AlignCenter().Text(accountReceivableId.ToString()).Bold().FontSize(16);
+                        });
+                    });
+
+                    column.Item().PaddingTop(10).AlignCenter().Text("CUENTA POR COBRAR").Bold().FontSize(14);
+                });
+
+                page.Content().PaddingTop(10).Column(mainColumn =>
+                {
+                    mainColumn.Item().PaddingBottom(6).Row(row =>
+                    {
+                        row.RelativeItem().Text(t =>
+                        {
+                            t.Span("CLIENTE: ").Bold();
+                            t.Span(clientName);
+                        });
+                        row.RelativeItem().Text(t =>
+                        {
+                            t.Span("N° SALIDA: ").Bold();
+                            t.Span(issue is not null ? issue.IssueId.ToString().PadLeft(5, '0') : "—");
+                        });
+                        row.RelativeItem().Text(t =>
+                        {
+                            t.Span("FECHA: ").Bold();
+                            t.Span(issue is not null ? issue.IssueDate.ToString("dd/MM/yyyy") : "—");
+                        });
+                    });
+
+                    mainColumn.Item().PaddingBottom(10).Row(row =>
+                    {
+                        row.RelativeItem().Text(t =>
+                        {
+                            t.Span("FORMA DE PAGO: ").Bold();
+                            t.Span(paymentTypeLabel);
+                        });
+                        row.RelativeItem().Text(t =>
+                        {
+                            t.Span("FECHA LÍMITE: ").Bold();
+                            t.Span(accountReceivable.DueDate.HasValue ? accountReceivable.DueDate.Value.ToString("dd/MM/yyyy") : "—");
+                        });
+                        row.RelativeItem().Text(t =>
+                        {
+                            t.Span("ESTADO: ").Bold();
+                            t.Span(statusLabel);
+                        });
+                    });
+
+                    mainColumn.Item().Text("PRODUCTOS").Bold().FontSize(10);
+
+                    mainColumn.Item().PaddingTop(4).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.ConstantColumn(42);
+                            columns.ConstantColumn(80);
+                            columns.RelativeColumn(1);
+                            columns.ConstantColumn(58);
+                            columns.ConstantColumn(48);
+                            columns.ConstantColumn(68);
+                            columns.ConstantColumn(68);
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CÓDIGO");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DEPT.");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DESCRIPCIÓN");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("UNIDAD\nDE MEDIDA");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CANTIDAD");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("VALOR\nUNITARIO (Bs.)");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("VALOR\nTOTAL (Bs.)");
+                        });
+
+                        if (lines.Count == 0)
+                        {
+                            table.Cell().ColumnSpan(7).Element(VoucherBodyCell).AlignCenter().Text("Sin productos asociados.");
+                        }
+                        else
+                        {
+                            foreach (var line in lines)
+                            {
+                                table.Cell().Element(VoucherBodyCell).Text(line.Code ?? "—");
+                                table.Cell().Element(VoucherBodyCell).Text(line.DepartmentName ?? "—");
+                                table.Cell().Element(VoucherBodyCell).Text(line.Name);
+                                table.Cell().Element(VoucherBodyCell).AlignCenter().Text(line.UnitMeasure ?? "—");
+                                table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.Quantity.ToString("N2", ReportCulture));
+                                table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.UnitCost.ToString("N2", ReportCulture));
+                                table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.TotalCost.ToString("N2", ReportCulture));
+                            }
+
+                            table.Cell().ColumnSpan(6).Element(VoucherTotalCell).AlignRight().Text("TOTAL PRODUCTOS (Bs.)").Bold();
+                            table.Cell().Element(VoucherTotalCell).AlignRight().Text(productsTotal.ToString("N2", ReportCulture)).Bold();
+                        }
+                    });
+
+                    mainColumn.Item().PaddingTop(14).Text("PAGOS").Bold().FontSize(10);
+
+                    mainColumn.Item().PaddingTop(4).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(1);
+                            columns.RelativeColumn(1);
+                            columns.RelativeColumn(2);
+                            columns.ConstantColumn(80);
+                            columns.ConstantColumn(80);
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("FECHA");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("MÉTODO");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("NOTAS");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("MONTO\n(Bs.)");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("SALDO\n(Bs.)");
+                        });
+
+                        if (payments.Count == 0)
+                        {
+                            table.Cell().ColumnSpan(5).Element(VoucherBodyCell).AlignCenter().Text("Sin pagos registrados.");
+                        }
+                        else
+                        {
+                            var balance = accountReceivable.TotalAmount;
+                            foreach (var payment in payments)
+                            {
+                                balance = Math.Max(balance - payment.Amount, 0);
+                                table.Cell().Element(VoucherBodyCell).Text(payment.PaymentDate.ToString("dd/MM/yyyy HH:mm"));
+                                table.Cell().Element(VoucherBodyCell).Text(payment.PaymentMethod ?? "—");
+                                table.Cell().Element(VoucherBodyCell).Text(payment.Notes ?? "—");
+                                table.Cell().Element(VoucherBodyCell).AlignRight().Text(payment.Amount.ToString("N2", ReportCulture));
+                                table.Cell().Element(VoucherBodyCell).AlignRight().Text(balance.ToString("N2", ReportCulture));
+                            }
+                        }
+                    });
+
+                    mainColumn.Item().PaddingTop(10).Row(row =>
+                    {
+                        row.Spacing(10);
+                        row.RelativeItem().Element(c => SummaryTextCard(c, "Total", accountReceivable.TotalAmount.ToString("N2", ReportCulture)));
+                        row.RelativeItem().Element(c => SummaryTextCard(c, "Saldo Pendiente", accountReceivable.OutstandingBalance.ToString("N2", ReportCulture)));
+                    });
+                });
+
+                page.Footer().PaddingTop(5).Row(row =>
+                {
+                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignRight().Text(x =>
+                    {
+                        x.Span("Pág. ").FontSize(8);
+                        x.CurrentPageNumber().FontSize(8);
+                    });
+                });
+            });
+        });
+
+        return document.GeneratePdf();
+    }
+
     private static byte[] GetLogoBytes()
     {
         if (_logoBytes is not null)

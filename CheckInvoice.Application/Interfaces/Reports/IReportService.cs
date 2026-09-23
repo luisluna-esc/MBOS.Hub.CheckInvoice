@@ -28,4 +28,5 @@ public interface IReportService
     Task<byte[]> GeneratePastorFieldReportPdf(PastorFieldReportQueryFilter filter);
     Task<List<AccountReceivablesReportRowDto>> GetAccountReceivablesReport(AccountReceivablesReportQueryFilter filter);
     Task<byte[]> GenerateAccountReceivablesReportPdf(AccountReceivablesReportQueryFilter filter);
+    Task<byte[]?> GenerateAccountReceivableVoucherPdf(long accountReceivableId);
 }

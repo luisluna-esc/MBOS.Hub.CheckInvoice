@@ -238,4 +238,17 @@ public class ReportsController : ControllerBase
         var pdfBytes = await _reportService.GenerateAccountReceivablesReportPdf(filter);
         return File(pdfBytes, "application/pdf", "cuentas-por-cobrar.pdf");
     }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("account-receivable-voucher/{accountReceivableId}/pdf")]
+    public async Task<IActionResult> GetAccountReceivableVoucherPdf(long accountReceivableId)
+    {
+        var pdfBytes = await _reportService.GenerateAccountReceivableVoucherPdf(accountReceivableId);
+        if (pdfBytes is null)
+        {
+            return NotFound();
+        }
+        return File(pdfBytes, "application/pdf", $"cuenta-por-cobrar-{accountReceivableId}.pdf");
+    }
 }
