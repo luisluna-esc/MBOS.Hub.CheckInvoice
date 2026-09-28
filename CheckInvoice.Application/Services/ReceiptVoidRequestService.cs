@@ -119,6 +119,35 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
             };
         }
 
+        var receipt = await _unitOfWork.Repository<Receipt>().GetByIdAsync(receiptVoidRequestCreateDto.ReceiptId);
+        if (receipt is null || receipt.IsVoided)
+        {
+            return new ResponsePost
+            {
+                Id = 0,
+                Messages = [new Message { Type = MessageType.Error, Description = "The receipt no longer exists or is already voided." }],
+                StatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
+        // Se avisa de inmediato al solicitar, en vez de esperar a que el Contador la apruebe y
+        // recién ahí se entere de que ya no se puede: el stock que esta entrada agregó ya se usó
+        // (Salidas/Transferencias posteriores) y no alcanza para revertirlo.
+        var insufficientProductIds = await GetInsufficientProductIdsAsync(receipt);
+        if (insufficientProductIds.Count > 0)
+        {
+            return new ResponsePost
+            {
+                Id = 0,
+                Messages = [new Message
+                {
+                    Type = MessageType.Error,
+                    Description = $"Cannot void this receipt: stock for product(s) {string.Join(", ", insufficientProductIds)} has already been partially or fully used and is insufficient to reverse."
+                }],
+                StatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
         var request = new ReceiptVoidRequest
         {
             ReceiptId = receiptVoidRequestCreateDto.ReceiptId,
@@ -171,28 +200,10 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
         // A diferencia de anular una Salida (que solo devuelve stock, siempre seguro), anular
         // una Entrada descuenta el stock que esa entrada agregó — si parte de ese stock ya se
         // consumió (Salidas/Transferencias posteriores), la anulación dejaría el stock negativo.
-        // Se valida todo antes de tocar nada, sin aplicar cambios parciales.
-        var stockRepository = _unitOfWork.Repository<Stock>();
-        var receiptDetails = await _unitOfWork.Repository<ReceiptDetail>().Query()
-            .Where(d => d.ReceiptId == receipt.ReceiptId)
-            .ToListAsync();
-
-        var stocksByProduct = new Dictionary<long, Stock>();
-        var insufficientProductIds = new List<long>();
-
-        foreach (var detail in receiptDetails)
-        {
-            var stock = await stockRepository.Query()
-                .FirstOrDefaultAsync(s => s.WarehouseId == receipt.WarehouseId && s.ProductId == detail.ProductId);
-
-            if (stock is null || stock.Quantity < detail.Quantity)
-            {
-                insufficientProductIds.Add(detail.ProductId);
-                continue;
-            }
-
-            stocksByProduct[detail.ProductId] = stock;
-        }
+        // Se valida todo antes de tocar nada, sin aplicar cambios parciales. RequestVoid ya
+        // valida esto mismo al solicitar, pero el stock pudo cambiar entre la solicitud y esta
+        // aprobación, así que se revisa de nuevo aquí antes de aplicar el descuento real.
+        var insufficientProductIds = await GetInsufficientProductIdsAsync(receipt);
 
         if (insufficientProductIds.Count > 0)
         {
@@ -208,9 +219,15 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
             };
         }
 
+        var stockRepository = _unitOfWork.Repository<Stock>();
+        var receiptDetails = await _unitOfWork.Repository<ReceiptDetail>().Query()
+            .Where(d => d.ReceiptId == receipt.ReceiptId)
+            .ToListAsync();
+
         foreach (var detail in receiptDetails)
         {
-            var stock = stocksByProduct[detail.ProductId];
+            var stock = await stockRepository.Query()
+                .FirstAsync(s => s.WarehouseId == receipt.WarehouseId && s.ProductId == detail.ProductId);
             stock.Quantity -= detail.Quantity;
             stockRepository.Update(stock);
         }
@@ -263,6 +280,29 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
             Messages = [new Message { Type = MessageType.Success, Description = "Void request rejected." }],
             StatusCode = HttpStatusCode.OK
         };
+    }
+
+    private async Task<List<long>> GetInsufficientProductIdsAsync(Receipt receipt)
+    {
+        var stockRepository = _unitOfWork.Repository<Stock>();
+        var receiptDetails = await _unitOfWork.Repository<ReceiptDetail>().Query()
+            .Where(d => d.ReceiptId == receipt.ReceiptId)
+            .ToListAsync();
+
+        var insufficientProductIds = new List<long>();
+
+        foreach (var detail in receiptDetails)
+        {
+            var stock = await stockRepository.Query()
+                .FirstOrDefaultAsync(s => s.WarehouseId == receipt.WarehouseId && s.ProductId == detail.ProductId);
+
+            if (stock is null || stock.Quantity < detail.Quantity)
+            {
+                insufficientProductIds.Add(detail.ProductId);
+            }
+        }
+
+        return insufficientProductIds;
     }
 
     private static ResponsePost NotFoundResponse(long id) => new()

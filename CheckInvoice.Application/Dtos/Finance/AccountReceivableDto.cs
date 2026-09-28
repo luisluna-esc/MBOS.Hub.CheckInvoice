@@ -8,6 +8,7 @@ public class AccountReceivableDto
     public long? ClientId { get; set; }
     public decimal TotalAmount { get; set; }
     public decimal OutstandingBalance { get; set; }
+    public decimal PaidAmount { get; set; }
     public string PaymentType { get; set; } = string.Empty;
     public string? PaymentDetail { get; set; }
     public DateOnly? DueDate { get; set; }

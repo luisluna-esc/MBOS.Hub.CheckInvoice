@@ -3,6 +3,7 @@ using CheckInvoice.Application.Dtos.Products;
 using CheckInvoice.Application.Interfaces.Products;
 using CheckInvoice.core.Configuration;
 using CheckInvoice.core.Entities.Catalogs;
+using CheckInvoice.core.Entities.Movements;
 using CheckInvoice.core.Entities.Products;
 using CheckInvoice.core.Entities.Warehouses;
 using CheckInvoice.core.Entities.ResponseApi.Details;
@@ -172,6 +173,16 @@ public class ProductService : IProductService
             };
         }
 
+        if (await IsProductInUseAsync(id))
+        {
+            return new ResponsePost
+            {
+                Id = id,
+                Messages = [new Message { Type = MessageType.Error, Description = "This product already has movements (receipts, issues or transfers) and can no longer be edited." }],
+                StatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
         // Code no se toca aquí: se genera una sola vez al crear y es inmutable.
         product.Name = productDto.Name;
         product.DepartmentId = productDto.DepartmentId;
@@ -205,6 +216,16 @@ public class ProductService : IProductService
             };
         }
 
+        if (await IsProductInUseAsync(id))
+        {
+            return new ResponsePost
+            {
+                Id = id,
+                Messages = [new Message { Type = MessageType.Error, Description = "This product already has movements (receipts, issues or transfers) and can no longer be deleted." }],
+                StatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
         repository.Remove(product);
         await _unitOfWork.SaveChangesAsync();
 
@@ -214,6 +235,18 @@ public class ProductService : IProductService
             Messages = [new Message { Type = MessageType.Success, Description = "Product deleted successfully." }],
             StatusCode = HttpStatusCode.OK
         };
+    }
+
+    // "En uso" = tiene al menos un movimiento histórico (Entrada, Salida o Transferencia).
+    // Editarlo o eliminarlo en ese punto rompería reportes/kardex que ya lo referencian por ese
+    // ProductId, o directamente fallaría por la FK — mejor avisar con un mensaje claro antes.
+    private async Task<bool> IsProductInUseAsync(long productId)
+    {
+        var hasReceiptDetail = await _unitOfWork.Repository<ReceiptDetail>().Query().AnyAsync(d => d.ProductId == productId);
+        var hasIssueDetail = await _unitOfWork.Repository<IssueDetail>().Query().AnyAsync(d => d.ProductId == productId);
+        var hasTransferDetail = await _unitOfWork.Repository<TransferDetail>().Query().AnyAsync(d => d.ProductId == productId);
+
+        return hasReceiptDetail || hasIssueDetail || hasTransferDetail;
     }
 
     private async Task ValidateForeignKeys(ProductDto productDto, List<Message> errors)

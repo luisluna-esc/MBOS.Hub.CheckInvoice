@@ -1332,8 +1332,8 @@ public class ReportService : IReportService
         }
 
         // El nombre de quien "Recibí Conforme" se preimprime con el usuario que registró la
-        // entrada en el sistema — Autorizado Por / Departamento Contable quedan en blanco
-        // para firma manual, igual que en el formato en papel que ya usa el cliente.
+        // entrada en el sistema — Departamento Contable queda en blanco para firma manual,
+        // igual que en el formato en papel que ya usa el cliente.
         var receivedByName = "—";
         if (receipt.CreatedById.HasValue)
         {
@@ -1463,11 +1463,9 @@ public class ReportService : IReportService
 
                     mainColumn.Item().PaddingTop(40).Row(row =>
                     {
-                        row.RelativeItem().Column(c => SignatureBox(c, "Autorizado Por:", null));
+                        row.RelativeItem().Column(c => SignatureBox(c, receivedByName));
                         row.ConstantItem(20);
-                        row.RelativeItem().Column(c => SignatureBox(c, "Recibí Conforme:", receivedByName));
-                        row.ConstantItem(20);
-                        row.RelativeItem().Column(c => SignatureBox(c, "Departamento Contable:", null));
+                        row.RelativeItem().Column(c => SignatureBox(c, null));
                     });
                 });
 
@@ -1542,10 +1540,16 @@ public class ReportService : IReportService
             printTypeName = printType?.Name ?? printTypeName;
         }
 
+        var issueTypeName = "—";
+        if (issue.IssueTypeId.HasValue)
+        {
+            var issueType = await _unitOfWork.Repository<IssueType>().GetByIdAsync(issue.IssueTypeId.Value);
+            issueTypeName = issueType?.Name ?? issueTypeName;
+        }
+
         // "Responsable de Inventarios" se preimprime con el usuario que registró la salida en
-        // el sistema — Autorizado Por queda en blanco para firma manual. "Recibí Conforme" es
-        // el Cliente (quien recibe el material), a diferencia del comprobante de Entrada donde
-        // ese rol lo cumple quien registró el ingreso.
+        // el sistema. "Recibí Conforme" es el Cliente (quien recibe el material), a diferencia
+        // del comprobante de Entrada donde ese rol lo cumple quien registró el ingreso.
         var inventoryManagerName = "—";
         if (issue.CreatedById.HasValue)
         {
@@ -1574,7 +1578,7 @@ public class ReportService : IReportService
 
         var document = isRoll
             ? BuildIssueVoucherRollDocument(issueId, printTypeName, issue, lines, total, warehouseName, clientName, username)
-            : BuildIssueVoucherFullPageDocument(issueId, printTypeName, issue, lines, total, warehouseName, clientName, inventoryManagerName, username);
+            : BuildIssueVoucherFullPageDocument(issueId, printTypeName, issueTypeName, issue, lines, total, warehouseName, clientName, inventoryManagerName, username);
 
         return document.GeneratePdf();
     }
@@ -1582,6 +1586,7 @@ public class ReportService : IReportService
     private static Document BuildIssueVoucherFullPageDocument(
         long issueId,
         string printTypeName,
+        string issueTypeName,
         Issue issue,
         List<IssueVoucherLineDto> lines,
         decimal total,
@@ -1639,7 +1644,7 @@ public class ReportService : IReportService
                     mainColumn.Item().PaddingBottom(6).Text(t =>
                     {
                         t.Span("TIPO DE SALIDA: ").Bold();
-                        t.Span(printTypeName);
+                        t.Span(issueTypeName);
                     });
 
                     mainColumn.Item().PaddingBottom(6).Text(t =>
@@ -1689,11 +1694,9 @@ public class ReportService : IReportService
 
                     mainColumn.Item().PaddingTop(40).Row(row =>
                     {
-                        row.RelativeItem().Column(c => SignatureBox(c, "Autorizado Por:", null));
+                        row.RelativeItem().Column(c => SignatureBox(c, clientName));
                         row.ConstantItem(20);
-                        row.RelativeItem().Column(c => SignatureBox(c, "Recibí Conforme:", clientName));
-                        row.ConstantItem(20);
-                        row.RelativeItem().Column(c => SignatureBox(c, "Responsable de Inventarios:", inventoryManagerName));
+                        row.RelativeItem().Column(c => SignatureBox(c, inventoryManagerName));
                     });
                 });
 
@@ -1811,6 +1814,13 @@ public class ReportService : IReportService
                     mainColumn.Item().PaddingTop(4).Text(
                         $"SON: {NumberToSpanishWords((long)decimal.Truncate(total))} {(int)((total - decimal.Truncate(total)) * 100):00}/100 BOLIVIANOS"
                     ).FontSize(7).Italic();
+
+                    // Dos espacios de firma apilados (el rollo mide 80mm de ancho, no hay lugar
+                    // para ponerlos lado a lado como en la versión de página completa) — el ancho
+                    // de la página no cambia, solo crece el alto porque page.ContinuousSize() ya
+                    // se ajusta automáticamente al contenido.
+                    mainColumn.Item().PaddingTop(10).Column(c => RollSignatureLine(c, null));
+                    mainColumn.Item().PaddingTop(8).Column(c => RollSignatureLine(c, clientName));
 
                     mainColumn.Item().PaddingTop(6).LineHorizontal(1).LineColor(Colors.Black);
                     mainColumn.Item().PaddingTop(3).AlignCenter().Text("Comprobante interno de salida de almacén.").FontSize(6);
@@ -2107,9 +2117,9 @@ public class ReportService : IReportService
 
                     mainColumn.Item().PaddingTop(40).Row(row =>
                     {
-                        row.RelativeItem().Column(c => SignatureBox(c, "Envía:", senderName));
+                        row.RelativeItem().Column(c => SignatureBox(c, senderName));
                         row.ConstantItem(20);
-                        row.RelativeItem().Column(c => SignatureBox(c, "Recibe:", receiverName));
+                        row.RelativeItem().Column(c => SignatureBox(c, receiverName));
                     });
                 });
 
@@ -2142,11 +2152,45 @@ public class ReportService : IReportService
     private static IContainer VoucherTotalCell(IContainer container) =>
         container.Border(1).BorderColor(Colors.Black).Background(Colors.Grey.Lighten2).Padding(4).DefaultTextStyle(x => x.FontSize(8));
 
-    private static void SignatureBox(QuestPDF.Fluent.ColumnDescriptor column, string label, string? name)
+    private static void SignatureBox(QuestPDF.Fluent.ColumnDescriptor column, string? name)
     {
-        column.Item().Text(label).Bold().FontSize(9);
         column.Item().Height(28);
         column.Item().BorderTop(1).BorderColor(Colors.Grey.Darken1).PaddingTop(2).AlignCenter().Text(name ?? "").FontSize(8);
+    }
+
+    // "late" no se guarda en account_receivable.status (ver sp_get_account_receivables en
+    // storedProcedures.sql, que ya devuelve el estado efectivo) — este helper replica el mismo
+    // criterio para el comprobante individual, que lee la entidad directo por EF en vez de
+    // pasar por ese stored procedure.
+    private static string EffectiveAccountReceivableStatus(string status, DateOnly? dueDate) => status switch
+    {
+        "paid" => "paid",
+        "pending" when dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow) => "late",
+        _ => status
+    };
+
+    private static string AccountReceivableStatusLabel(string status) => status switch
+    {
+        "paid" => "Pagado",
+        "late" => "Pago Retrasado",
+        _ => "Pendiente"
+    };
+
+    // Payment.PaymentMethod se guarda como 'cash'/'transfer' (el formulario ya no deja texto
+    // libre) — valores viejos de antes de ese cambio caen al else y se muestran tal cual.
+    private static string PaymentMethodLabel(string? paymentMethod) => paymentMethod switch
+    {
+        "cash" => "Efectivo",
+        "transfer" => "Transacción",
+        null or "" => "—",
+        _ => paymentMethod
+    };
+
+    // Igual que SignatureBox (línea y nombre debajo) pero a tamaño reducido (fuente/alto),
+    // para que quepa en el ancho angosto del rollo térmico (80mm).
+    private static void RollSignatureLine(QuestPDF.Fluent.ColumnDescriptor column, string? name)
+    {
+        column.Item().BorderTop(1).BorderColor(Colors.Grey.Darken1).PaddingTop(2).AlignCenter().Text(name ?? "").FontSize(7);
     }
 
     private const string GetKardexByProductReportSql = """
@@ -2568,7 +2612,7 @@ public class ReportService : IReportService
                                 table.Cell().Element(BodyCell).Text(row.PaymentDate.ToString("dd/MM/yyyy"));
                                 table.Cell().Element(BodyCell).Text(row.IssueId.HasValue ? row.IssueId.Value.ToString().PadLeft(5, '0') : "—");
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.Amount.ToString("N2", ReportCulture));
-                                table.Cell().Element(BodyCell).Text(row.PaymentMethod ?? "—");
+                                table.Cell().Element(BodyCell).Text(PaymentMethodLabel(row.PaymentMethod));
                                 table.Cell().Element(BodyCell).Text(row.Notes ?? "");
                             }
                         });
@@ -2602,6 +2646,7 @@ public class ReportService : IReportService
             product_names AS "ProductNames",
             total_amount AS "TotalAmount",
             outstanding_balance AS "OutstandingBalance",
+            paid_amount AS "PaidAmount",
             due_date AS "DueDate",
             status AS "Status"
         FROM sp_get_account_receivables_report({0}::bigint, {1}::varchar, {2}::date, {3}::date)
@@ -2637,6 +2682,7 @@ public class ReportService : IReportService
         var statusLabel = filter.Status switch
         {
             "pending" => "Pendientes",
+            "late" => "Pago retrasado",
             "paid" => "Pagadas",
             _ => "Todos los estados"
         };
@@ -2695,14 +2741,15 @@ public class ReportService : IReportService
                     {
                         table.ColumnsDefinition(columns =>
                         {
-                            columns.RelativeColumn(1.8f);
+                            columns.RelativeColumn(1.6f);
+                            columns.RelativeColumn(0.8f);
+                            columns.RelativeColumn(1);
+                            columns.RelativeColumn(1);
+                            columns.RelativeColumn(2.1f);
+                            columns.RelativeColumn(0.9f);
                             columns.RelativeColumn(0.9f);
                             columns.RelativeColumn(1);
                             columns.RelativeColumn(1);
-                            columns.RelativeColumn(2.4f);
-                            columns.RelativeColumn(1);
-                            columns.RelativeColumn(1.1f);
-                            columns.RelativeColumn(0.9f);
                         });
 
                         table.Header(header =>
@@ -2713,6 +2760,7 @@ public class ReportService : IReportService
                             header.Cell().Element(HeaderCell).Text("Fecha\nLímite");
                             header.Cell().Element(HeaderCell).Text("Productos");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Total");
+                            header.Cell().Element(HeaderCell).AlignRight().Text("Pagos");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Saldo\nPendiente");
                             header.Cell().Element(HeaderCell).AlignCenter().Text("Estado");
                         });
@@ -2725,12 +2773,14 @@ public class ReportService : IReportService
                             table.Cell().Element(BodyCell).Text(row.DueDate.HasValue ? row.DueDate.Value.ToString("dd/MM/yyyy") : "—");
                             table.Cell().Element(BodyCell).Text(row.ProductNames ?? "—");
                             table.Cell().Element(BodyCell).AlignRight().Text(row.TotalAmount.ToString("N2", ReportCulture));
+                            table.Cell().Element(BodyCell).AlignRight().Text(row.PaidAmount.ToString("N2", ReportCulture));
                             table.Cell().Element(BodyCell).AlignRight().Text(row.OutstandingBalance.ToString("N2", ReportCulture));
-                            table.Cell().Element(BodyCell).AlignCenter().Text(row.Status == "paid" ? "Pagado" : "Pendiente");
+                            table.Cell().Element(BodyCell).AlignCenter().Text(AccountReceivableStatusLabel(row.Status));
                         }
 
                         table.Cell().ColumnSpan(5).Element(CategoryTotalCell).AlignRight().Text("Total Cartera").Bold();
                         table.Cell().Element(CategoryTotalCell).AlignRight().Text(totalPortfolio.ToString("N2", ReportCulture)).Bold();
+                        table.Cell().Element(CategoryTotalCell).Text("");
                         table.Cell().Element(CategoryTotalCell).AlignRight().Text(totalOutstanding.ToString("N2", ReportCulture)).Bold();
                         table.Cell().Element(CategoryTotalCell).Text("");
                     });
@@ -2815,7 +2865,7 @@ public class ReportService : IReportService
             _ => accountReceivable.PaymentType
         };
 
-        var statusLabel = accountReceivable.Status == "paid" ? "Pagado" : "Pendiente";
+        var statusLabel = AccountReceivableStatusLabel(EffectiveAccountReceivableStatus(accountReceivable.Status, accountReceivable.DueDate));
 
         var document = Document.Create(container =>
         {
@@ -2968,7 +3018,7 @@ public class ReportService : IReportService
                             {
                                 balance = Math.Max(balance - payment.Amount, 0);
                                 table.Cell().Element(VoucherBodyCell).Text(payment.PaymentDate.ToString("dd/MM/yyyy HH:mm"));
-                                table.Cell().Element(VoucherBodyCell).Text(payment.PaymentMethod ?? "—");
+                                table.Cell().Element(VoucherBodyCell).Text(PaymentMethodLabel(payment.PaymentMethod));
                                 table.Cell().Element(VoucherBodyCell).Text(payment.Notes ?? "—");
                                 table.Cell().Element(VoucherBodyCell).AlignRight().Text(payment.Amount.ToString("N2", ReportCulture));
                                 table.Cell().Element(VoucherBodyCell).AlignRight().Text(balance.ToString("N2", ReportCulture));

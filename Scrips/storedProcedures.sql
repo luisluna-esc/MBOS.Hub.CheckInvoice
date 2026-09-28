@@ -98,6 +98,7 @@ $$;
 -- Piloto 2: AccountReceivableService.GetAllAccountReceivables hacía 2 consultas
 -- separadas (página + fecha de la salida vinculada). Ahora es una sola con LEFT JOIN.
 DROP FUNCTION IF EXISTS sp_get_account_receivables(BIGINT, BIGINT, VARCHAR, VARCHAR, INT, INT);
+DROP FUNCTION IF EXISTS sp_get_account_receivables(BIGINT, BIGINT, VARCHAR, VARCHAR, INT, INT, VARCHAR);
 CREATE OR REPLACE FUNCTION sp_get_account_receivables(
     p_account_receivable_id BIGINT,
     p_client_id BIGINT,
@@ -114,6 +115,7 @@ RETURNS TABLE (
     client_id BIGINT,
     total_amount NUMERIC,
     outstanding_balance NUMERIC,
+    paid_amount NUMERIC,
     payment_type VARCHAR,
     payment_detail VARCHAR,
     due_date DATE,
@@ -125,6 +127,9 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 AS $$
+    -- "late" no es un valor guardado en account_receivable.status: se deriva comparando
+    -- due_date contra hoy solo cuando el estado real todavía es 'pending'. Se calcula acá
+    -- (una sola vez) para que la grilla, el filtro y el reporte usen siempre el mismo criterio.
     SELECT
         a.account_receivable_id,
         a.issue_id,
@@ -132,10 +137,15 @@ AS $$
         a.client_id,
         a.total_amount,
         a.outstanding_balance,
+        a.total_amount - a.outstanding_balance AS paid_amount,
         a.payment_type,
         a.payment_detail,
         a.due_date,
-        a.status,
+        CASE
+            WHEN a.status = 'paid' THEN 'paid'
+            WHEN a.status = 'pending' AND a.due_date IS NOT NULL AND a.due_date < CURRENT_DATE THEN 'late'
+            ELSE a.status
+        END AS status,
         a.created_at,
         a.created_by AS created_by_id,
         CAST(COUNT(*) OVER() AS INT) AS total_records
@@ -146,7 +156,16 @@ AS $$
     WHERE (p_account_receivable_id IS NULL OR a.account_receivable_id = p_account_receivable_id)
       AND (p_client_id IS NULL OR a.client_id = p_client_id)
       AND (p_payment_type IS NULL OR a.payment_type = p_payment_type)
-      AND (p_status IS NULL OR a.status = p_status)
+      AND (
+            p_status IS NULL
+            OR (
+                CASE
+                    WHEN a.status = 'paid' THEN 'paid'
+                    WHEN a.status = 'pending' AND a.due_date IS NOT NULL AND a.due_date < CURRENT_DATE THEN 'late'
+                    ELSE a.status
+                END
+              ) = p_status
+          )
       AND (p_client_name IS NULL OR p.name ILIKE '%' || p_client_name || '%')
     ORDER BY a.created_at DESC
     LIMIT p_page_size OFFSET (p_page_number - 1) * p_page_size;
@@ -175,6 +194,7 @@ RETURNS TABLE (
     product_names VARCHAR,
     total_amount NUMERIC,
     outstanding_balance NUMERIC,
+    paid_amount NUMERIC,
     due_date DATE,
     status VARCHAR
 )
@@ -191,8 +211,13 @@ AS $$
         id_count.product_names,
         ar.total_amount,
         ar.outstanding_balance,
+        ar.total_amount - ar.outstanding_balance AS paid_amount,
         ar.due_date,
-        ar.status
+        CASE
+            WHEN ar.status = 'paid' THEN 'paid'
+            WHEN ar.status = 'pending' AND ar.due_date IS NOT NULL AND ar.due_date < CURRENT_DATE THEN 'late'
+            ELSE ar.status
+        END AS status
     FROM account_receivable ar
     LEFT JOIN issue i ON i.issue_id = ar.issue_id
     LEFT JOIN client c ON c.client_id = ar.client_id
@@ -206,7 +231,16 @@ AS $$
         WHERE id2.issue_id = ar.issue_id
     ) id_count ON TRUE
     WHERE (p_client_id IS NULL OR ar.client_id = p_client_id)
-      AND (p_status IS NULL OR ar.status = p_status)
+      AND (
+            p_status IS NULL
+            OR (
+                CASE
+                    WHEN ar.status = 'paid' THEN 'paid'
+                    WHEN ar.status = 'pending' AND ar.due_date IS NOT NULL AND ar.due_date < CURRENT_DATE THEN 'late'
+                    ELSE ar.status
+                END
+              ) = p_status
+          )
       AND (p_date_from IS NULL OR ar.due_date >= p_date_from)
       AND (p_date_to IS NULL OR ar.due_date < p_date_to + 1)
     ORDER BY (ar.status = 'paid'), ar.due_date NULLS LAST, ar.account_receivable_id;

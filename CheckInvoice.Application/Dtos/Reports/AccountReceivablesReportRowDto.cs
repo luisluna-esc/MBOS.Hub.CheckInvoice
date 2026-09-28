@@ -11,6 +11,7 @@ public class AccountReceivablesReportRowDto
     public string? ProductNames { get; set; }
     public decimal TotalAmount { get; set; }
     public decimal OutstandingBalance { get; set; }
+    public decimal PaidAmount { get; set; }
     public DateOnly? DueDate { get; set; }
     public string Status { get; set; } = string.Empty;
 }

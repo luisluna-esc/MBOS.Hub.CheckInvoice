@@ -47,6 +47,7 @@ public class AccountReceivableService : IAccountReceivableService
             client_id AS "ClientId",
             total_amount AS "TotalAmount",
             outstanding_balance AS "OutstandingBalance",
+            paid_amount AS "PaidAmount",
             payment_type AS "PaymentType",
             payment_detail AS "PaymentDetail",
             due_date AS "DueDate",
