@@ -8,40 +8,40 @@ public class ReceiptRequestValidator : AbstractValidator<ReceiptRequestDto>
     public ReceiptRequestValidator()
     {
         RuleFor(x => x.WarehouseId)
-            .GreaterThan(0).WithMessage("WarehouseId is required.");
+            .GreaterThan(0).WithMessage("Debes seleccionar un almacén.");
 
         RuleFor(x => x.TaxId)
-            .MaximumLength(20).WithMessage("TaxId must not exceed 20 characters.");
+            .MaximumLength(20).WithMessage("El NIT no puede superar los 20 caracteres.");
 
         RuleFor(x => x.InvoiceNumber)
-            .MaximumLength(50).WithMessage("InvoiceNumber must not exceed 50 characters.");
+            .MaximumLength(50).WithMessage("El número de factura no puede superar los 50 caracteres.");
 
         RuleFor(x => x.Description)
-            .MaximumLength(255).WithMessage("Description must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("La descripción no puede superar los 255 caracteres.");
 
         RuleFor(x => x.InvoiceTotal)
-            .GreaterThanOrEqualTo(0).WithMessage("InvoiceTotal must not be negative.")
+            .GreaterThanOrEqualTo(0).WithMessage("El total de la factura no puede ser negativo.")
             .When(x => x.InvoiceTotal.HasValue);
 
         RuleFor(x => x.Details)
-            .NotEmpty().WithMessage("A receipt must have at least one detail line.");
+            .NotEmpty().WithMessage("La entrada debe tener al menos una línea de producto.");
 
         RuleForEach(x => x.Details).ChildRules(detail =>
         {
             detail.RuleFor(d => d.ProductId)
-                .GreaterThan(0).WithMessage("ProductId is required.");
+                .GreaterThan(0).WithMessage("Debes seleccionar un producto.");
 
             detail.RuleFor(d => d.Quantity)
-                .GreaterThan(0).WithMessage("Quantity must be greater than zero.");
+                .GreaterThan(0).WithMessage("La cantidad debe ser mayor a cero.");
 
             detail.RuleFor(d => d.UnitCost)
-                .GreaterThanOrEqualTo(0).WithMessage("UnitCost must not be negative.");
+                .GreaterThanOrEqualTo(0).WithMessage("El costo unitario no puede ser negativo.");
 
             detail.RuleFor(d => d.WorkOrder)
-                .MaximumLength(50).WithMessage("WorkOrder must not exceed 50 characters.");
+                .MaximumLength(50).WithMessage("La orden de trabajo no puede superar los 50 caracteres.");
 
             detail.RuleFor(d => d.Detail)
-                .MaximumLength(255).WithMessage("Detail must not exceed 255 characters.");
+                .MaximumLength(255).WithMessage("El detalle no puede superar los 255 caracteres.");
         });
     }
 }

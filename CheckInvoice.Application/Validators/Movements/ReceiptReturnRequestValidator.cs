@@ -8,24 +8,24 @@ public class ReceiptReturnRequestValidator : AbstractValidator<ReceiptReturnRequ
     public ReceiptReturnRequestValidator()
     {
         RuleFor(x => x.IssueId)
-            .GreaterThan(0).WithMessage("IssueId is required.");
+            .GreaterThan(0).WithMessage("Debes indicar la salida de origen.");
 
         RuleFor(x => x.ReceiptTypeId)
-            .GreaterThan(0).WithMessage("ReceiptTypeId is required.");
+            .GreaterThan(0).WithMessage("Debes seleccionar un tipo de entrada.");
 
         RuleFor(x => x.Description)
-            .MaximumLength(255).WithMessage("Description must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("La descripción no puede superar los 255 caracteres.");
 
         RuleFor(x => x.Lines)
-            .NotEmpty().WithMessage("A return must have at least one line.");
+            .NotEmpty().WithMessage("La devolución debe tener al menos una línea.");
 
         RuleForEach(x => x.Lines).ChildRules(line =>
         {
             line.RuleFor(l => l.ProductId)
-                .GreaterThan(0).WithMessage("ProductId is required.");
+                .GreaterThan(0).WithMessage("Debes seleccionar un producto.");
 
             line.RuleFor(l => l.Quantity)
-                .GreaterThan(0).WithMessage("Quantity must be greater than zero.");
+                .GreaterThan(0).WithMessage("La cantidad debe ser mayor a cero.");
         });
     }
 }

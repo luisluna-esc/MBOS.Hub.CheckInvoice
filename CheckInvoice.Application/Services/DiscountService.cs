@@ -90,7 +90,7 @@ public class DiscountService : IDiscountService
         if (discountDto.ClientId.HasValue &&
             !await _unitOfWork.Repository<Client>().Query().AnyAsync(c => c.ClientId == discountDto.ClientId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "ClientId does not reference an existing client." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El cliente seleccionado no existe." });
         }
 
         if (errors.Count == 0)
@@ -104,7 +104,7 @@ public class DiscountService : IDiscountService
 
             if (!sourceExists)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = $"SourceId does not reference an existing record in '{discountDto.SourceTable}'." });
+                errors.Add(new Message { Type = MessageType.Error, Description = $"El registro de origen no existe en '{discountDto.SourceTable}'." });
             }
         }
 
@@ -135,7 +135,7 @@ public class DiscountService : IDiscountService
         return new ResponsePost
         {
             Id = discount.DiscountId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Discount created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Descuento creado correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }
@@ -147,7 +147,7 @@ public class DiscountService : IDiscountService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = $"Status must be one of: {string.Join(", ", ValidStatusTransitions)}." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "El estado debe ser 'aprobado' o 'rechazado'." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -160,7 +160,7 @@ public class DiscountService : IDiscountService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Discount not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el descuento." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -170,7 +170,7 @@ public class DiscountService : IDiscountService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = $"Only discounts in 'pending' status can change status. Current status: '{discount.Status}'." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Solo se puede cambiar el estado de descuentos pendientes." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -182,7 +182,7 @@ public class DiscountService : IDiscountService
         return new ResponsePost
         {
             Id = discount.DiscountId,
-            Messages = [new Message { Type = MessageType.Success, Description = $"Discount {discountStatusUpdateDto.Status} successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = discountStatusUpdateDto.Status == "approved" ? "Descuento aprobado correctamente." : "Descuento rechazado correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }

@@ -35,7 +35,7 @@ public class AuthService : IAuthService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "Invalid username/email or password." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Usuario/correo o contraseña incorrectos." }],
                 StatusCode = HttpStatusCode.Unauthorized
             };
         }
@@ -45,7 +45,7 @@ public class AuthService : IAuthService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "This user is inactive." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Este usuario está inactivo. Contacta al administrador." }],
                 StatusCode = HttpStatusCode.Unauthorized
             };
         }
@@ -61,7 +61,7 @@ public class AuthService : IAuthService
         return new ResponseGetObject
         {
             Data = authResponse,
-            Messages = [new Message { Type = MessageType.Success, Description = "Login successful." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Inicio de sesión exitoso." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -77,7 +77,7 @@ public class AuthService : IAuthService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "Invalid or expired refresh token." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "La sesión expiró o no es válida. Vuelve a iniciar sesión." }],
                 StatusCode = HttpStatusCode.Unauthorized
             };
         }
@@ -88,7 +88,7 @@ public class AuthService : IAuthService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "This user is inactive." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Este usuario está inactivo. Contacta al administrador." }],
                 StatusCode = HttpStatusCode.Unauthorized
             };
         }
@@ -103,7 +103,7 @@ public class AuthService : IAuthService
         return new ResponseGetObject
         {
             Data = authResponse,
-            Messages = [new Message { Type = MessageType.Success, Description = "Token refreshed successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Sesión renovada correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -119,7 +119,7 @@ public class AuthService : IAuthService
             return new ResponsePost
             {
                 Id = 0,
-                Messages = [new Message { Type = MessageType.Error, Description = "Refresh token not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la sesión a cerrar." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -132,7 +132,7 @@ public class AuthService : IAuthService
         return new ResponsePost
         {
             Id = existingToken.RefreshTokenId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Logout successful." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Sesión cerrada correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }

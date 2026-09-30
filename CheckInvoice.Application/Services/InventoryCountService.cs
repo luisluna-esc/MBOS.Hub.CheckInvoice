@@ -88,7 +88,7 @@ public class InventoryCountService : IInventoryCountService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "InventoryCount not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el ajuste de inventario." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -124,20 +124,20 @@ public class InventoryCountService : IInventoryCountService
 
         if (!await _unitOfWork.Repository<Warehouse>().Query().AnyAsync(w => w.WarehouseId == inventoryCountRequestDto.WarehouseId))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "WarehouseId does not reference an existing warehouse." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El almacén seleccionado no existe." });
         }
 
         if (inventoryCountRequestDto.SourceCountId.HasValue &&
             !await _unitOfWork.Repository<InventoryCount>().Query().AnyAsync(i => i.InventoryCountId == inventoryCountRequestDto.SourceCountId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "SourceCountId does not reference an existing inventory count." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El ajuste de inventario de origen no existe." });
         }
 
         foreach (var line in inventoryCountRequestDto.Details)
         {
             if (!await _unitOfWork.Repository<Product>().Query().AnyAsync(p => p.ProductId == line.ProductId))
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = $"ProductId {line.ProductId} does not reference an existing product." });
+                errors.Add(new Message { Type = MessageType.Error, Description = $"El producto con ID {line.ProductId} no existe." });
             }
         }
 
@@ -218,7 +218,7 @@ public class InventoryCountService : IInventoryCountService
         return new ResponsePost
         {
             Id = inventoryCount.InventoryCountId,
-            Messages = [new Message { Type = MessageType.Success, Description = "InventoryCount created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Ajuste de inventario registrado correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }

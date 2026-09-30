@@ -136,7 +136,7 @@ public class ProductService : IProductService
         return new ResponsePost
         {
             Id = product.ProductId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Product created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Producto creado correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }
@@ -168,7 +168,7 @@ public class ProductService : IProductService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Product not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el producto." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -178,7 +178,7 @@ public class ProductService : IProductService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "This product already has movements (receipts, issues or transfers) and can no longer be edited." }],
+                Messages = [new Message { Type = MessageType.Error, Description = $"No se puede editar \"{product.Name}\" porque ya tiene movimientos registrados (entradas, salidas o transferencias)." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -196,7 +196,7 @@ public class ProductService : IProductService
         return new ResponsePost
         {
             Id = product.ProductId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Product updated successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Producto actualizado correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -211,7 +211,7 @@ public class ProductService : IProductService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Product not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el producto." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -221,7 +221,7 @@ public class ProductService : IProductService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "This product already has movements (receipts, issues or transfers) and can no longer be deleted." }],
+                Messages = [new Message { Type = MessageType.Error, Description = $"No se puede eliminar \"{product.Name}\" porque ya tiene movimientos registrados (entradas, salidas o transferencias)." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -232,7 +232,7 @@ public class ProductService : IProductService
         return new ResponsePost
         {
             Id = product.ProductId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Product deleted successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Producto eliminado correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -254,19 +254,19 @@ public class ProductService : IProductService
         if (productDto.DepartmentId.HasValue &&
             !await _unitOfWork.Repository<Department>().Query().AnyAsync(d => d.DepartmentId == productDto.DepartmentId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "DepartmentId does not reference an existing department." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El departamento seleccionado no existe." });
         }
 
         if (productDto.SubDepartmentId.HasValue &&
             !await _unitOfWork.Repository<SubDepartment>().Query().AnyAsync(s => s.SubDepartmentId == productDto.SubDepartmentId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "SubDepartmentId does not reference an existing sub-department." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El subdepartamento seleccionado no existe." });
         }
 
         if (productDto.MediaTypeId.HasValue &&
             !await _unitOfWork.Repository<MediaType>().Query().AnyAsync(m => m.MediaTypeId == productDto.MediaTypeId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "MediaTypeId does not reference an existing media type." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "La unidad de medida seleccionada no existe." });
         }
     }
 

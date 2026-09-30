@@ -8,10 +8,10 @@ public class WarehouseValidator : AbstractValidator<WarehouseDto>
     public WarehouseValidator()
     {
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("Name is required.")
-            .MaximumLength(100).WithMessage("Name must not exceed 100 characters.");
+            .NotEmpty().WithMessage("El nombre es obligatorio.")
+            .MaximumLength(100).WithMessage("El nombre no puede superar los 100 caracteres.");
 
         RuleFor(x => x.Address)
-            .MaximumLength(255).WithMessage("Address must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("La dirección no puede superar los 255 caracteres.");
     }
 }

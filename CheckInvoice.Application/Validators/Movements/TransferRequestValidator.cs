@@ -8,31 +8,31 @@ public class TransferRequestValidator : AbstractValidator<TransferRequestDto>
     public TransferRequestValidator()
     {
         RuleFor(x => x.SourceWarehouseId)
-            .GreaterThan(0).WithMessage("SourceWarehouseId must reference a valid warehouse.")
+            .GreaterThan(0).WithMessage("El almacén de origen no es válido.")
             .When(x => x.SourceWarehouseId.HasValue);
 
         RuleFor(x => x.DestinationWarehouseId)
-            .GreaterThan(0).WithMessage("DestinationWarehouseId is required.");
+            .GreaterThan(0).WithMessage("Debes seleccionar un almacén de destino.");
 
         RuleFor(x => x)
             .Must(x => x.DestinationWarehouseId != x.SourceWarehouseId!.Value)
             .When(x => x.SourceWarehouseId.HasValue)
-            .WithMessage("DestinationWarehouseId must be different from SourceWarehouseId.")
+            .WithMessage("El almacén de destino debe ser diferente al de origen.")
             .OverridePropertyName("DestinationWarehouseId");
 
         RuleFor(x => x.Details)
-            .NotEmpty().WithMessage("A transfer must have at least one detail line.");
+            .NotEmpty().WithMessage("La transferencia debe tener al menos una línea de producto.");
 
         RuleForEach(x => x.Details).ChildRules(detail =>
         {
             detail.RuleFor(d => d.ProductId)
-                .GreaterThan(0).WithMessage("ProductId is required.");
+                .GreaterThan(0).WithMessage("Debes seleccionar un producto.");
 
             detail.RuleFor(d => d.Quantity)
-                .GreaterThan(0).WithMessage("Quantity must be greater than zero.");
+                .GreaterThan(0).WithMessage("La cantidad debe ser mayor a cero.");
 
             detail.RuleFor(d => d.UnitPrice)
-                .GreaterThanOrEqualTo(0).WithMessage("UnitPrice must not be negative.")
+                .GreaterThanOrEqualTo(0).WithMessage("El precio unitario no puede ser negativo.")
                 .When(d => d.UnitPrice.HasValue);
         });
     }

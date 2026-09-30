@@ -8,10 +8,10 @@ public class ProductValidator : AbstractValidator<ProductDto>
     public ProductValidator()
     {
         RuleFor(x => x.Code)
-            .MaximumLength(20).WithMessage("Code must not exceed 20 characters.");
+            .MaximumLength(20).WithMessage("El código no puede superar los 20 caracteres.");
 
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("Name is required.")
-            .MaximumLength(200).WithMessage("Name must not exceed 200 characters.");
+            .NotEmpty().WithMessage("El nombre es obligatorio.")
+            .MaximumLength(200).WithMessage("El nombre no puede superar los 200 caracteres.");
     }
 }

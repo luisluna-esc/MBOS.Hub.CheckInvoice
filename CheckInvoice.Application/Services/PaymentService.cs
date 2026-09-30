@@ -89,7 +89,7 @@ public class PaymentService : IPaymentService
 
         if (accountReceivable is null)
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "AccountReceivableId does not reference an existing account receivable." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "La cuenta por cobrar seleccionada no existe." });
         }
 
         Installment? installment = null;
@@ -101,11 +101,11 @@ public class PaymentService : IPaymentService
 
             if (installment is null)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "InstallmentId does not reference an existing installment." });
+                errors.Add(new Message { Type = MessageType.Error, Description = "La cuota seleccionada no existe." });
             }
             else if (installment.AccountReceivableId != paymentDto.AccountReceivableId)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "InstallmentId does not belong to the given AccountReceivableId." });
+                errors.Add(new Message { Type = MessageType.Error, Description = "La cuota seleccionada no pertenece a esta cuenta por cobrar." });
             }
         }
 
@@ -127,7 +127,7 @@ public class PaymentService : IPaymentService
                 Messages = [new Message
                 {
                     Type = MessageType.Error,
-                    Description = $"Payment amount exceeds outstanding balance: {accountReceivable.OutstandingBalance} remaining, {paymentDto.Amount} requested."
+                    Description = $"El pago supera el saldo pendiente: quedan {accountReceivable.OutstandingBalance}, se intentó registrar {paymentDto.Amount}."
                 }],
                 StatusCode = HttpStatusCode.BadRequest
             };
@@ -173,7 +173,7 @@ public class PaymentService : IPaymentService
         return new ResponsePost
         {
             Id = payment.PaymentId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Payment created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Pago registrado correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }

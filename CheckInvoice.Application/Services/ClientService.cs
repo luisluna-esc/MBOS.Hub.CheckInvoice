@@ -123,11 +123,11 @@ public class ClientService : IClientService
             linkedParty = await _unitOfWork.Repository<Party>().GetByIdAsync(clientDto.PartyId.Value);
             if (linkedParty is null)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "PartyId does not reference an existing identity." });
+                errors.Add(new Message { Type = MessageType.Error, Description = "La identidad seleccionada no existe." });
             }
             else if (await _unitOfWork.Repository<Client>().Query().AnyAsync(c => c.PartyId == linkedParty.PartyId))
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "This identity is already registered as a client." });
+                errors.Add(new Message { Type = MessageType.Error, Description = "Esta identidad ya está registrada como cliente." });
             }
         }
 
@@ -174,7 +174,7 @@ public class ClientService : IClientService
         return new ResponsePost
         {
             Id = client.ClientId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Client created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Cliente creado correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }
@@ -189,7 +189,7 @@ public class ClientService : IClientService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Client not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el cliente." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -240,7 +240,7 @@ public class ClientService : IClientService
         return new ResponsePost
         {
             Id = client.ClientId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Client updated successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Cliente actualizado correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -255,7 +255,7 @@ public class ClientService : IClientService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Client not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el cliente." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -266,7 +266,7 @@ public class ClientService : IClientService
         return new ResponsePost
         {
             Id = client.ClientId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Client deleted successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Cliente eliminado correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -276,31 +276,31 @@ public class ClientService : IClientService
         if (clientDto.AppUserId.HasValue &&
             !await _unitOfWork.Repository<AppUser>().Query().AnyAsync(u => u.AppUserId == clientDto.AppUserId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "AppUserId does not reference an existing user." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El usuario seleccionado no existe." });
         }
 
         if (clientDto.DocumentTypeId.HasValue &&
             !await _unitOfWork.Repository<DocumentType>().Query().AnyAsync(d => d.DocumentTypeId == clientDto.DocumentTypeId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "DocumentTypeId does not reference an existing document type." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El tipo de documento seleccionado no existe." });
         }
 
         if (clientDto.DistrictId.HasValue &&
             !await _unitOfWork.Repository<District>().Query().AnyAsync(d => d.DistrictId == clientDto.DistrictId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "DistrictId does not reference an existing district." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El distrito seleccionado no existe." });
         }
 
         if (clientDto.ChurchId.HasValue &&
             !await _unitOfWork.Repository<Church>().Query().AnyAsync(c => c.ChurchId == clientDto.ChurchId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "ChurchId does not reference an existing church." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "La iglesia seleccionada no existe." });
         }
 
         if (clientDto.SpecialCaseId.HasValue &&
             !await _unitOfWork.Repository<SpecialCase>().Query().AnyAsync(s => s.SpecialCaseId == clientDto.SpecialCaseId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "SpecialCaseId does not reference an existing special case." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El caso especial seleccionado no existe." });
         }
     }
 
@@ -314,7 +314,7 @@ public class ClientService : IClientService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "Client not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el cliente." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -324,7 +324,7 @@ public class ClientService : IClientService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "This client is not marked as Pastor." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Este cliente no está marcado como Pastor." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -334,7 +334,7 @@ public class ClientService : IClientService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "This client already has portal access." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Este cliente ya tiene acceso al portal." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -346,7 +346,7 @@ public class ClientService : IClientService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "The client needs a registered email before granting portal access." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "El cliente necesita un correo registrado antes de darle acceso al portal." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -357,7 +357,7 @@ public class ClientService : IClientService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "The 'Pastor' role does not exist. Contact an administrator." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "El rol 'Pastor' no existe. Contacta a un administrador." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -377,7 +377,7 @@ public class ClientService : IClientService
                 return new ResponseGetObject
                 {
                     Data = new(),
-                    Messages = [new Message { Type = MessageType.Error, Description = "A user account with this email is already linked to another client." }],
+                    Messages = [new Message { Type = MessageType.Error, Description = "Ya existe una cuenta de usuario con este correo, vinculada a otro cliente." }],
                     StatusCode = HttpStatusCode.BadRequest
                 };
             }
@@ -427,7 +427,7 @@ public class ClientService : IClientService
         return new ResponseGetObject
         {
             Data = new { AppUserId = appUserId, TemporaryPassword = temporaryPassword },
-            Messages = [new Message { Type = MessageType.Success, Description = "Portal access granted successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Acceso al portal otorgado correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -442,7 +442,7 @@ public class ClientService : IClientService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "Client not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el cliente." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -452,7 +452,7 @@ public class ClientService : IClientService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "This client is not marked as Pastor." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Este cliente no está marcado como Pastor." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -462,7 +462,7 @@ public class ClientService : IClientService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "This client does not have portal access yet." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Este cliente todavía no tiene acceso al portal." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -483,7 +483,7 @@ public class ClientService : IClientService
         return new ResponseGetObject
         {
             Data = new { AppUserId = client.AppUserId.Value, TemporaryPassword = temporaryPassword },
-            Messages = [new Message { Type = MessageType.Success, Description = "Password reset successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Contraseña restablecida correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }

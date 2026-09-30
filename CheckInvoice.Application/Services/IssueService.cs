@@ -121,7 +121,7 @@ public class IssueService : IIssueService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "Issue not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la salida." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -155,13 +155,13 @@ public class IssueService : IIssueService
 
         if (!await _unitOfWork.Repository<Warehouse>().Query().AnyAsync(w => w.WarehouseId == issueRequestDto.WarehouseId))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "WarehouseId does not reference an existing warehouse." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El almacén seleccionado no existe." });
         }
 
         if (issueRequestDto.IssueTypeId.HasValue &&
             !await _unitOfWork.Repository<IssueType>().Query().AnyAsync(i => i.IssueTypeId == issueRequestDto.IssueTypeId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "IssueTypeId does not reference an existing issue type." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El tipo de salida seleccionado no existe." });
         }
 
         if (issueRequestDto.WarehousePeriodId.HasValue)
@@ -171,31 +171,31 @@ public class IssueService : IIssueService
 
             if (warehousePeriod is null)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "WarehousePeriodId does not reference an existing warehouse period." });
+                errors.Add(new Message { Type = MessageType.Error, Description = "El período de almacén seleccionado no existe." });
             }
             else if (warehousePeriod.IsClosed)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "This warehouse period is closed and cannot receive new movements." });
+                errors.Add(new Message { Type = MessageType.Error, Description = "Este período de almacén está cerrado y ya no admite nuevos movimientos." });
             }
         }
 
         if (issueRequestDto.ClientId.HasValue &&
             !await _unitOfWork.Repository<Client>().Query().AnyAsync(c => c.ClientId == issueRequestDto.ClientId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "ClientId does not reference an existing client." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El cliente seleccionado no existe." });
         }
 
         if (issueRequestDto.PrintTypeId.HasValue &&
             !await _unitOfWork.Repository<PrintType>().Query().AnyAsync(p => p.PrintTypeId == issueRequestDto.PrintTypeId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "PrintTypeId does not reference an existing print type." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El tipo de impresión seleccionado no existe." });
         }
 
         foreach (var line in issueRequestDto.Details)
         {
             if (!await _unitOfWork.Repository<Product>().Query().AnyAsync(p => p.ProductId == line.ProductId))
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = $"ProductId {line.ProductId} does not reference an existing product." });
+                errors.Add(new Message { Type = MessageType.Error, Description = $"El producto con ID {line.ProductId} no existe." });
             }
         }
 
@@ -224,10 +224,11 @@ public class IssueService : IIssueService
 
             if (available < requested)
             {
+                var product = await _unitOfWork.Repository<Product>().GetByIdAsync(productId);
                 errors.Add(new Message
                 {
                     Type = MessageType.Error,
-                    Description = $"Insufficient stock for ProductId {productId}: {available} available, {requested} requested."
+                    Description = $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}."
                 });
                 continue;
             }
@@ -317,7 +318,7 @@ public class IssueService : IIssueService
         return new ResponsePost
         {
             Id = issue.IssueId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Issue created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Salida registrada correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }

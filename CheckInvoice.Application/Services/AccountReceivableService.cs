@@ -113,13 +113,13 @@ public class AccountReceivableService : IAccountReceivableService
         if (accountReceivableDto.IssueId.HasValue &&
             !await _unitOfWork.Repository<Issue>().Query().AnyAsync(i => i.IssueId == accountReceivableDto.IssueId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "IssueId does not reference an existing issue." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "La salida seleccionada no existe." });
         }
 
         if (accountReceivableDto.ClientId.HasValue &&
             !await _unitOfWork.Repository<Client>().Query().AnyAsync(c => c.ClientId == accountReceivableDto.ClientId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "ClientId does not reference an existing client." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El cliente seleccionado no existe." });
         }
 
         if (errors.Count > 0)
@@ -152,7 +152,7 @@ public class AccountReceivableService : IAccountReceivableService
         return new ResponsePost
         {
             Id = accountReceivable.AccountReceivableId,
-            Messages = [new Message { Type = MessageType.Success, Description = "AccountReceivable created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Cuenta por cobrar creada correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }

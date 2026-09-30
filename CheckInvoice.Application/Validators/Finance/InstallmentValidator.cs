@@ -8,12 +8,12 @@ public class InstallmentValidator : AbstractValidator<InstallmentDto>
     public InstallmentValidator()
     {
         RuleFor(x => x.AccountReceivableId)
-            .GreaterThan(0).WithMessage("AccountReceivableId is required.");
+            .GreaterThan(0).WithMessage("Debes indicar la cuenta por cobrar.");
 
         RuleFor(x => x.InstallmentNumber)
-            .GreaterThan(0).WithMessage("InstallmentNumber must be greater than zero.");
+            .GreaterThan(0).WithMessage("El número de cuota debe ser mayor a cero.");
 
         RuleFor(x => x.InstallmentAmount)
-            .GreaterThan(0).WithMessage("InstallmentAmount must be greater than zero.");
+            .GreaterThan(0).WithMessage("El monto de la cuota debe ser mayor a cero.");
     }
 }

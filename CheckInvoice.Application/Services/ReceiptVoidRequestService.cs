@@ -5,6 +5,7 @@ using CheckInvoice.Application.Interfaces.Movements;
 using CheckInvoice.Application.Interfaces.Security;
 using CheckInvoice.core.Configuration;
 using CheckInvoice.core.Entities.Movements;
+using CheckInvoice.core.Entities.Products;
 using CheckInvoice.core.Entities.ResponseApi.Details;
 using CheckInvoice.core.Entities.ResponseApi.DisplayFormat;
 using CheckInvoice.core.Entities.Warehouses;
@@ -125,7 +126,7 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
             return new ResponsePost
             {
                 Id = 0,
-                Messages = [new Message { Type = MessageType.Error, Description = "The receipt no longer exists or is already voided." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "La entrada ya no existe o ya fue anulada." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -133,8 +134,8 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
         // Se avisa de inmediato al solicitar, en vez de esperar a que el Contador la apruebe y
         // recién ahí se entere de que ya no se puede: el stock que esta entrada agregó ya se usó
         // (Salidas/Transferencias posteriores) y no alcanza para revertirlo.
-        var insufficientProductIds = await GetInsufficientProductIdsAsync(receipt);
-        if (insufficientProductIds.Count > 0)
+        var insufficientProductNames = await GetInsufficientProductNamesAsync(receipt);
+        if (insufficientProductNames.Count > 0)
         {
             return new ResponsePost
             {
@@ -142,7 +143,7 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
                 Messages = [new Message
                 {
                     Type = MessageType.Error,
-                    Description = $"Cannot void this receipt: stock for product(s) {string.Join(", ", insufficientProductIds)} has already been partially or fully used and is insufficient to reverse."
+                    Description = $"No se puede anular esta entrada: el stock de {string.Join(", ", insufficientProductNames)} ya fue usado (total o parcialmente) en otro movimiento y no alcanza para revertir la entrada."
                 }],
                 StatusCode = HttpStatusCode.BadRequest
             };
@@ -164,7 +165,7 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
         return new ResponsePost
         {
             Id = request.ReceiptVoidRequestId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Void request submitted successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Solicitud de anulación enviada correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }
@@ -181,7 +182,7 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
 
         if (request.Status != "pending")
         {
-            return OnlyPendingResponse(id, request.Status, "approved");
+            return OnlyPendingResponse(id, request.Status, "aprobar");
         }
 
         var receiptRepository = _unitOfWork.Repository<Receipt>();
@@ -192,7 +193,7 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "The receipt no longer exists or is already voided." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "La entrada ya no existe o ya fue anulada." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -203,9 +204,9 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
         // Se valida todo antes de tocar nada, sin aplicar cambios parciales. RequestVoid ya
         // valida esto mismo al solicitar, pero el stock pudo cambiar entre la solicitud y esta
         // aprobación, así que se revisa de nuevo aquí antes de aplicar el descuento real.
-        var insufficientProductIds = await GetInsufficientProductIdsAsync(receipt);
+        var insufficientProductNames = await GetInsufficientProductNamesAsync(receipt);
 
-        if (insufficientProductIds.Count > 0)
+        if (insufficientProductNames.Count > 0)
         {
             return new ResponsePost
             {
@@ -213,7 +214,7 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
                 Messages = [new Message
                 {
                     Type = MessageType.Error,
-                    Description = $"Cannot void this receipt: stock for product(s) {string.Join(", ", insufficientProductIds)} has already been partially or fully used and is insufficient to reverse."
+                    Description = $"No se puede anular esta entrada: el stock de {string.Join(", ", insufficientProductNames)} ya fue usado (total o parcialmente) en otro movimiento y no alcanza para revertir la entrada."
                 }],
                 StatusCode = HttpStatusCode.BadRequest
             };
@@ -246,7 +247,7 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
         return new ResponsePost
         {
             Id = request.ReceiptVoidRequestId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Void request approved. The receipt was voided and its stock reversed." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Solicitud aprobada. La entrada fue anulada y su stock revertido." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -263,7 +264,7 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
 
         if (request.Status != "pending")
         {
-            return OnlyPendingResponse(id, request.Status, "rejected");
+            return OnlyPendingResponse(id, request.Status, "rechazar");
         }
 
         request.Status = "rejected";
@@ -277,19 +278,23 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
         return new ResponsePost
         {
             Id = request.ReceiptVoidRequestId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Void request rejected." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Solicitud de anulación rechazada." }],
             StatusCode = HttpStatusCode.OK
         };
     }
 
-    private async Task<List<long>> GetInsufficientProductIdsAsync(Receipt receipt)
+    // Devuelve el nombre del producto (no el ID crudo) para que el mensaje de error le diga
+    // al usuario exactamente qué producto está bloqueando la anulación, sin tener que ir a
+    // buscarlo en el catálogo.
+    private async Task<List<string>> GetInsufficientProductNamesAsync(Receipt receipt)
     {
         var stockRepository = _unitOfWork.Repository<Stock>();
+        var productRepository = _unitOfWork.Repository<Product>();
         var receiptDetails = await _unitOfWork.Repository<ReceiptDetail>().Query()
             .Where(d => d.ReceiptId == receipt.ReceiptId)
             .ToListAsync();
 
-        var insufficientProductIds = new List<long>();
+        var insufficientProductNames = new List<string>();
 
         foreach (var detail in receiptDetails)
         {
@@ -298,24 +303,33 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
 
             if (stock is null || stock.Quantity < detail.Quantity)
             {
-                insufficientProductIds.Add(detail.ProductId);
+                var product = await productRepository.GetByIdAsync(detail.ProductId);
+                insufficientProductNames.Add(product?.Name ?? $"#{detail.ProductId}");
             }
         }
 
-        return insufficientProductIds;
+        return insufficientProductNames;
     }
 
     private static ResponsePost NotFoundResponse(long id) => new()
     {
         Id = id,
-        Messages = [new Message { Type = MessageType.Error, Description = "Void request not found." }],
+        Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la solicitud de anulación." }],
         StatusCode = HttpStatusCode.NotFound
     };
 
     private static ResponsePost OnlyPendingResponse(long id, string currentStatus, string attemptedAction) => new()
     {
         Id = id,
-        Messages = [new Message { Type = MessageType.Error, Description = $"Only pending void requests can be {attemptedAction}. Current status: '{currentStatus}'." }],
+        Messages = [new Message { Type = MessageType.Error, Description = $"Solo se pueden {attemptedAction} solicitudes pendientes. Estado actual: {VoidRequestStatusLabel(currentStatus)}." }],
         StatusCode = HttpStatusCode.BadRequest
+    };
+
+    private static string VoidRequestStatusLabel(string status) => status switch
+    {
+        "pending" => "Pendiente",
+        "approved" => "Aprobada",
+        "rejected" => "Rechazada",
+        _ => status
     };
 }

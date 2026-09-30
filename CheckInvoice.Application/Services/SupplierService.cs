@@ -99,7 +99,7 @@ public class SupplierService : ISupplierService
         if (supplierDto.CountryId.HasValue &&
             !await _unitOfWork.Repository<Country>().Query().AnyAsync(c => c.CountryId == supplierDto.CountryId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "CountryId does not reference an existing country." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El país seleccionado no existe." });
         }
 
         Party? linkedParty = null;
@@ -108,11 +108,11 @@ public class SupplierService : ISupplierService
             linkedParty = await _unitOfWork.Repository<Party>().GetByIdAsync(supplierDto.PartyId.Value);
             if (linkedParty is null)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "PartyId does not reference an existing identity." });
+                errors.Add(new Message { Type = MessageType.Error, Description = "La identidad seleccionada no existe." });
             }
             else if (await _unitOfWork.Repository<Supplier>().Query().AnyAsync(s => s.PartyId == linkedParty.PartyId))
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "This identity is already registered as a supplier." });
+                errors.Add(new Message { Type = MessageType.Error, Description = "Esta identidad ya está registrada como proveedor." });
             }
         }
 
@@ -163,7 +163,7 @@ public class SupplierService : ISupplierService
         return new ResponsePost
         {
             Id = supplier.SupplierId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Supplier created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Proveedor creado correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }
@@ -178,7 +178,7 @@ public class SupplierService : ISupplierService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Supplier not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el proveedor." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -195,7 +195,7 @@ public class SupplierService : ISupplierService
         if (supplierDto.CountryId.HasValue &&
             !await _unitOfWork.Repository<Country>().Query().AnyAsync(c => c.CountryId == supplierDto.CountryId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "CountryId does not reference an existing country." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El país seleccionado no existe." });
         }
 
         if (errors.Count > 0)
@@ -232,7 +232,7 @@ public class SupplierService : ISupplierService
         return new ResponsePost
         {
             Id = supplier.SupplierId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Supplier updated successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Proveedor actualizado correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -256,7 +256,7 @@ public class SupplierService : ISupplierService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Supplier not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el proveedor." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -267,7 +267,7 @@ public class SupplierService : ISupplierService
         return new ResponsePost
         {
             Id = supplier.SupplierId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Supplier deleted successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Proveedor eliminado correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }

@@ -100,7 +100,7 @@ public class ChangeRequestService : IChangeRequestService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "Change request not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la solicitud de cambio." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -138,7 +138,7 @@ public class ChangeRequestService : IChangeRequestService
             return new ResponsePost
             {
                 Id = 0,
-                Messages = [new Message { Type = MessageType.Error, Description = $"You do not have permission to request changes on '{tableName}'." }],
+                Messages = [new Message { Type = MessageType.Error, Description = $"No tienes permiso para solicitar cambios en '{tableName}'." }],
                 StatusCode = HttpStatusCode.Forbidden
             };
         }
@@ -150,7 +150,7 @@ public class ChangeRequestService : IChangeRequestService
             return new ResponsePost
             {
                 Id = 0,
-                Messages = [new Message { Type = MessageType.Error, Description = $"No {tableName} found with id {changeRequestCreateDto.RecordId}." }],
+                Messages = [new Message { Type = MessageType.Error, Description = $"No se encontró el registro de '{tableName}' con ID {changeRequestCreateDto.RecordId}." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -194,7 +194,7 @@ public class ChangeRequestService : IChangeRequestService
         return new ResponsePost
         {
             Id = changeRequest.ChangeRequestId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Change request submitted successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Solicitud de cambio enviada correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }
@@ -209,7 +209,7 @@ public class ChangeRequestService : IChangeRequestService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Change request not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la solicitud de cambio." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -219,7 +219,7 @@ public class ChangeRequestService : IChangeRequestService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = $"Only pending change requests can be approved. Current status: '{changeRequest.Status}'." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Solo se pueden aprobar solicitudes de cambio pendientes." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -229,7 +229,7 @@ public class ChangeRequestService : IChangeRequestService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = $"You do not have permission to approve changes on '{changeRequest.TableName}'." }],
+                Messages = [new Message { Type = MessageType.Error, Description = $"No tienes permiso para aprobar cambios en '{changeRequest.TableName}'." }],
                 StatusCode = HttpStatusCode.Forbidden
             };
         }
@@ -241,7 +241,7 @@ public class ChangeRequestService : IChangeRequestService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = $"The {changeRequest.TableName} record no longer exists." }],
+                Messages = [new Message { Type = MessageType.Error, Description = $"El registro de '{changeRequest.TableName}' ya no existe." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -279,7 +279,7 @@ public class ChangeRequestService : IChangeRequestService
         return new ResponsePost
         {
             Id = changeRequest.ChangeRequestId,
-            Messages = [new Message { Type = MessageType.Success, Description = $"Change request approved and applied to {changeRequest.TableName}." }],
+            Messages = [new Message { Type = MessageType.Success, Description = $"Solicitud de cambio aprobada y aplicada a '{changeRequest.TableName}'." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -294,7 +294,7 @@ public class ChangeRequestService : IChangeRequestService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Change request not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la solicitud de cambio." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -304,7 +304,7 @@ public class ChangeRequestService : IChangeRequestService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = $"Only pending change requests can be rejected. Current status: '{changeRequest.Status}'." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Solo se pueden rechazar solicitudes de cambio pendientes." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -314,7 +314,7 @@ public class ChangeRequestService : IChangeRequestService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = $"You do not have permission to review changes on '{changeRequest.TableName}'." }],
+                Messages = [new Message { Type = MessageType.Error, Description = $"No tienes permiso para revisar cambios en '{changeRequest.TableName}'." }],
                 StatusCode = HttpStatusCode.Forbidden
             };
         }
@@ -330,7 +330,7 @@ public class ChangeRequestService : IChangeRequestService
         return new ResponsePost
         {
             Id = changeRequest.ChangeRequestId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Change request rejected." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Solicitud de cambio rechazada." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -388,13 +388,13 @@ public class ChangeRequestService : IChangeRequestService
 
             if (property is null || !property.CanWrite)
             {
-                errors.Add($"'{key}' is not a valid editable field for '{entityType.Name}'.");
+                errors.Add($"'{key}' no es un campo editable válido.");
                 continue;
             }
 
             if (string.Equals(property.Name, idPropertyName, StringComparison.OrdinalIgnoreCase))
             {
-                errors.Add($"'{key}' cannot be modified.");
+                errors.Add($"'{key}' no se puede modificar.");
                 continue;
             }
 
@@ -405,7 +405,7 @@ public class ChangeRequestService : IChangeRequestService
             }
             catch (Exception)
             {
-                errors.Add($"'{key}' has an invalid value for its type.");
+                errors.Add($"'{key}' tiene un valor inválido para su tipo de dato.");
             }
         }
 

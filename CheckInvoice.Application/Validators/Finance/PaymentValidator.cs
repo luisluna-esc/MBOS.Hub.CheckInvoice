@@ -8,15 +8,15 @@ public class PaymentValidator : AbstractValidator<PaymentDto>
     public PaymentValidator()
     {
         RuleFor(x => x.AccountReceivableId)
-            .GreaterThan(0).WithMessage("AccountReceivableId is required.");
+            .GreaterThan(0).WithMessage("Debes indicar la cuenta por cobrar.");
 
         RuleFor(x => x.Amount)
-            .GreaterThan(0).WithMessage("Amount must be greater than zero.");
+            .GreaterThan(0).WithMessage("El monto debe ser mayor a cero.");
 
         RuleFor(x => x.PaymentMethod)
-            .MaximumLength(30).WithMessage("PaymentMethod must not exceed 30 characters.");
+            .MaximumLength(30).WithMessage("El método de pago no puede superar los 30 caracteres.");
 
         RuleFor(x => x.Notes)
-            .MaximumLength(255).WithMessage("Notes must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("Las notas no pueden superar los 255 caracteres.");
     }
 }

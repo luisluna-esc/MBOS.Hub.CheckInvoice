@@ -8,36 +8,36 @@ public class IssueRequestValidator : AbstractValidator<IssueRequestDto>
     public IssueRequestValidator()
     {
         RuleFor(x => x.WarehouseId)
-            .GreaterThan(0).WithMessage("WarehouseId is required.");
+            .GreaterThan(0).WithMessage("Debes seleccionar un almacén.");
 
         RuleFor(x => x.Complement)
-            .MaximumLength(10).WithMessage("Complement must not exceed 10 characters.");
+            .MaximumLength(10).WithMessage("El complemento no puede superar los 10 caracteres.");
 
         RuleFor(x => x.Description)
-            .MaximumLength(255).WithMessage("Description must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("La descripción no puede superar los 255 caracteres.");
 
         RuleFor(x => x.Details)
-            .NotEmpty().WithMessage("An issue must have at least one detail line.");
+            .NotEmpty().WithMessage("La salida debe tener al menos una línea de producto.");
 
         RuleFor(x => x.ClientId)
-            .NotNull().WithMessage("ClientId is required when SendToAccountsReceivable is true.")
+            .NotNull().WithMessage("Debes seleccionar un cliente para enviar a Cuentas por Cobrar.")
             .When(x => x.SendToAccountsReceivable);
 
         RuleFor(x => x.PaymentType)
-            .NotEmpty().WithMessage("PaymentType is required when SendToAccountsReceivable is true.")
-            .MaximumLength(20).WithMessage("PaymentType must not exceed 20 characters.")
+            .NotEmpty().WithMessage("Debes indicar el tipo de pago para enviar a Cuentas por Cobrar.")
+            .MaximumLength(20).WithMessage("El tipo de pago no puede superar los 20 caracteres.")
             .When(x => x.SendToAccountsReceivable);
 
         RuleFor(x => x.PaymentDetail)
-            .MaximumLength(255).WithMessage("PaymentDetail must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("El detalle de pago no puede superar los 255 caracteres.");
 
         RuleForEach(x => x.Details).ChildRules(detail =>
         {
             detail.RuleFor(d => d.ProductId)
-                .GreaterThan(0).WithMessage("ProductId is required.");
+                .GreaterThan(0).WithMessage("Debes seleccionar un producto.");
 
             detail.RuleFor(d => d.Quantity)
-                .GreaterThan(0).WithMessage("Quantity must be greater than zero.");
+                .GreaterThan(0).WithMessage("La cantidad debe ser mayor a cero.");
         });
     }
 }

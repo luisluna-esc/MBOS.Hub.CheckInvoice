@@ -13,15 +13,15 @@ public class ReceiptVoidRequestCreateValidator : AbstractValidator<ReceiptVoidRe
     {
         RuleFor(x => x.ReceiptId)
             .MustAsync((receiptId, ct) => IsVoidableReceiptAsync(unitOfWork, receiptId, ct))
-            .WithMessage("This receipt does not exist, is already voided, or already has a pending void request.");
+            .WithMessage("Esta entrada no existe, ya fue anulada o ya tiene una solicitud de anulación pendiente.");
 
         RuleFor(x => x.VoidReasonId)
             .MustAsync((voidReasonId, ct) => unitOfWork.Repository<VoidReason>().Query()
                 .AnyAsync(r => r.VoidReasonId == voidReasonId, ct))
-            .WithMessage("VoidReasonId does not reference an existing void reason.");
+            .WithMessage("El motivo de anulación seleccionado no existe.");
 
         RuleFor(x => x.Detail)
-            .MaximumLength(255).WithMessage("Detail must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("El detalle no puede superar los 255 caracteres.");
     }
 
     private static async Task<bool> IsVoidableReceiptAsync(IUnitOfWork unitOfWork, long receiptId, CancellationToken ct)

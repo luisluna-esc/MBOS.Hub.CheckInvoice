@@ -98,7 +98,7 @@ public class WarehouseService : IWarehouseService
         return new ResponsePost
         {
             Id = warehouse.WarehouseId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Warehouse created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Almacén creado correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }
@@ -126,7 +126,7 @@ public class WarehouseService : IWarehouseService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Warehouse not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el almacén." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -141,7 +141,7 @@ public class WarehouseService : IWarehouseService
         return new ResponsePost
         {
             Id = warehouse.WarehouseId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Warehouse updated successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Almacén actualizado correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -156,7 +156,7 @@ public class WarehouseService : IWarehouseService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "Warehouse not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el almacén." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -167,7 +167,7 @@ public class WarehouseService : IWarehouseService
         return new ResponsePost
         {
             Id = warehouse.WarehouseId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Warehouse deleted successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Almacén eliminado correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }

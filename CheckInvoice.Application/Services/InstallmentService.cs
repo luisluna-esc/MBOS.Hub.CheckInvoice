@@ -79,7 +79,7 @@ public class InstallmentService : IInstallmentService
 
         if (!await _unitOfWork.Repository<AccountReceivable>().Query().AnyAsync(a => a.AccountReceivableId == installmentDto.AccountReceivableId))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "AccountReceivableId does not reference an existing account receivable." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "La cuenta por cobrar seleccionada no existe." });
         }
 
         if (errors.Count > 0)
@@ -107,7 +107,7 @@ public class InstallmentService : IInstallmentService
         return new ResponsePost
         {
             Id = installment.InstallmentId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Installment created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Cuota creada correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }

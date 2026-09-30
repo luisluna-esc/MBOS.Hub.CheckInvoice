@@ -121,7 +121,7 @@ public class TransferService : ITransferService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "Transfer not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la transferencia." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -156,37 +156,37 @@ public class TransferService : ITransferService
         if (transferRequestDto.SourceWarehouseId.HasValue &&
             !await _unitOfWork.Repository<Warehouse>().Query().AnyAsync(w => w.WarehouseId == transferRequestDto.SourceWarehouseId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "SourceWarehouseId does not reference an existing warehouse." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El almacén de origen seleccionado no existe." });
         }
 
         if (!await _unitOfWork.Repository<Warehouse>().Query().AnyAsync(w => w.WarehouseId == transferRequestDto.DestinationWarehouseId))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "DestinationWarehouseId does not reference an existing warehouse." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El almacén de destino seleccionado no existe." });
         }
 
         if (transferRequestDto.SenderUserId.HasValue &&
             !await _unitOfWork.Repository<AppUser>().Query().AnyAsync(u => u.AppUserId == transferRequestDto.SenderUserId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "SenderUserId does not reference an existing user." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El usuario que envía no existe." });
         }
 
         if (transferRequestDto.ReceiverUserId.HasValue &&
             !await _unitOfWork.Repository<AppUser>().Query().AnyAsync(u => u.AppUserId == transferRequestDto.ReceiverUserId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "ReceiverUserId does not reference an existing user." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El usuario que recibe no existe." });
         }
 
         if (transferRequestDto.ReceiverClientId.HasValue &&
             !await _unitOfWork.Repository<Client>().Query().AnyAsync(c => c.ClientId == transferRequestDto.ReceiverClientId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "ReceiverClientId does not reference an existing client." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El cliente receptor seleccionado no existe." });
         }
 
         foreach (var line in transferRequestDto.Details)
         {
             if (!await _unitOfWork.Repository<Product>().Query().AnyAsync(p => p.ProductId == line.ProductId))
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = $"ProductId {line.ProductId} does not reference an existing product." });
+                errors.Add(new Message { Type = MessageType.Error, Description = $"El producto con ID {line.ProductId} no existe." });
             }
         }
 
@@ -218,10 +218,11 @@ public class TransferService : ITransferService
 
                 if (available < requested)
                 {
+                    var product = await _unitOfWork.Repository<Product>().GetByIdAsync(productId);
                     errors.Add(new Message
                     {
                         Type = MessageType.Error,
-                        Description = $"Insufficient stock for ProductId {productId}: {available} available, {requested} requested."
+                        Description = $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}."
                     });
                     continue;
                 }
@@ -298,7 +299,7 @@ public class TransferService : ITransferService
         return new ResponsePost
         {
             Id = transfer.TransferId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Transfer created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Transferencia registrada correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }
@@ -311,7 +312,7 @@ public class TransferService : ITransferService
             return new ResponsePost
             {
                 Id = transferId,
-                Messages = [new Message { Type = MessageType.Error, Description = "Transfer not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la transferencia." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -321,7 +322,7 @@ public class TransferService : ITransferService
             return new ResponsePost
             {
                 Id = transferId,
-                Messages = [new Message { Type = MessageType.Error, Description = "Transfer is already approved." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "Esta transferencia ya fue aprobada." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -337,7 +338,7 @@ public class TransferService : ITransferService
         return new ResponsePost
         {
             Id = transfer.TransferId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Transfer approved successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Transferencia aprobada correctamente." }],
             StatusCode = HttpStatusCode.OK
         };
     }

@@ -13,22 +13,22 @@ public class IssueVoidRequestCreateValidator : AbstractValidator<IssueVoidReques
     {
         RuleFor(x => x.IssueId)
             .MustAsync((issueId, ct) => IsVoidableIssueAsync(unitOfWork, issueId, ct))
-            .WithMessage("This issue does not exist, is already voided, or already has a pending void request.");
+            .WithMessage("Esta salida no existe, ya fue anulada o ya tiene una solicitud de anulación pendiente.");
 
         // Anular restaura el 100% del stock original de la Salida; si ya se registró una
         // Devolución parcial contra ella (Receipt.RelatedIssueId), anular duplicaría ese
         // stock ya devuelto. Se bloquea en vez de intentar calcular el neto.
         RuleFor(x => x.IssueId)
             .MustAsync((issueId, ct) => HasNoReturnsAsync(unitOfWork, issueId, ct))
-            .WithMessage("This issue already has a return registered against it and cannot be voided.");
+            .WithMessage("Esta salida ya tiene una devolución registrada y no se puede anular.");
 
         RuleFor(x => x.VoidReasonId)
             .MustAsync((voidReasonId, ct) => unitOfWork.Repository<VoidReason>().Query()
                 .AnyAsync(r => r.VoidReasonId == voidReasonId, ct))
-            .WithMessage("VoidReasonId does not reference an existing void reason.");
+            .WithMessage("El motivo de anulación seleccionado no existe.");
 
         RuleFor(x => x.Detail)
-            .MaximumLength(255).WithMessage("Detail must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("El detalle no puede superar los 255 caracteres.");
     }
 
     private static async Task<bool> IsVoidableIssueAsync(IUnitOfWork unitOfWork, long issueId, CancellationToken ct)

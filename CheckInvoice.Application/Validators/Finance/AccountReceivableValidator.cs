@@ -8,13 +8,13 @@ public class AccountReceivableValidator : AbstractValidator<AccountReceivableDto
     public AccountReceivableValidator()
     {
         RuleFor(x => x.TotalAmount)
-            .GreaterThan(0).WithMessage("TotalAmount must be greater than zero.");
+            .GreaterThan(0).WithMessage("El monto total debe ser mayor a cero.");
 
         RuleFor(x => x.PaymentType)
-            .NotEmpty().WithMessage("PaymentType is required.")
-            .MaximumLength(20).WithMessage("PaymentType must not exceed 20 characters.");
+            .NotEmpty().WithMessage("El tipo de pago es obligatorio.")
+            .MaximumLength(20).WithMessage("El tipo de pago no puede superar los 20 caracteres.");
 
         RuleFor(x => x.PaymentDetail)
-            .MaximumLength(255).WithMessage("PaymentDetail must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("El detalle de pago no puede superar los 255 caracteres.");
     }
 }

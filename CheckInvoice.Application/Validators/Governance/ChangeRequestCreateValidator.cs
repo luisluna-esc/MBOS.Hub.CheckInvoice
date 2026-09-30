@@ -11,24 +11,24 @@ public class ChangeRequestCreateValidator : AbstractValidator<ChangeRequestCreat
     public ChangeRequestCreateValidator()
     {
         RuleFor(x => x.TableName)
-            .NotEmpty().WithMessage("TableName is required.")
+            .NotEmpty().WithMessage("Debes indicar el tipo de registro.")
             .Must(t => ValidTableNames.Contains(t?.Trim().ToLowerInvariant()))
-            .WithMessage($"TableName must be one of: {string.Join(", ", ValidTableNames)}.");
+            .WithMessage("El tipo de registro no es válido.");
 
         RuleFor(x => x.RecordId)
-            .GreaterThan(0).WithMessage("RecordId is required.");
+            .GreaterThan(0).WithMessage("Debes indicar el registro a modificar.");
 
         RuleFor(x => x.Action)
-            .NotEmpty().WithMessage("Action is required.")
+            .NotEmpty().WithMessage("Debes indicar la acción a realizar.")
             .Must(a => ValidActions.Contains(a?.Trim().ToLowerInvariant()))
-            .WithMessage($"Action must be one of: {string.Join(", ", ValidActions)}.");
+            .WithMessage("La acción no es válida.");
 
         RuleFor(x => x.Reason)
-            .NotEmpty().WithMessage("Reason is required.")
-            .MaximumLength(255).WithMessage("Reason must not exceed 255 characters.");
+            .NotEmpty().WithMessage("El motivo es obligatorio.")
+            .MaximumLength(255).WithMessage("El motivo no puede superar los 255 caracteres.");
 
         RuleFor(x => x.ProposedData)
-            .NotEmpty().WithMessage("ProposedData is required when Action is 'edit'.")
+            .NotEmpty().WithMessage("Debes indicar los datos propuestos para editar.")
             .When(x => string.Equals(x.Action?.Trim(), "edit", StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -246,7 +246,7 @@ public class PortalService : IPortalService
     private static ResponseGetObject NoLinkedClientResponse() => new()
     {
         Data = new(),
-        Messages = [new Message { Type = MessageType.Error, Description = "Your account is not linked to a client profile." }],
+        Messages = [new Message { Type = MessageType.Error, Description = "Tu cuenta no está vinculada a un perfil de cliente." }],
         StatusCode = HttpStatusCode.NotFound
     };
 }

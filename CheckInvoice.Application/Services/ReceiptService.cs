@@ -122,7 +122,7 @@ public class ReceiptService : IReceiptService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "Receipt not found." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la entrada." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -158,13 +158,13 @@ public class ReceiptService : IReceiptService
 
         if (!await _unitOfWork.Repository<Warehouse>().Query().AnyAsync(w => w.WarehouseId == receiptRequestDto.WarehouseId))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "WarehouseId does not reference an existing warehouse." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El almacén seleccionado no existe." });
         }
 
         if (receiptRequestDto.SupplierId.HasValue &&
             !await _unitOfWork.Repository<Supplier>().Query().AnyAsync(s => s.SupplierId == receiptRequestDto.SupplierId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "SupplierId does not reference an existing supplier." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El proveedor seleccionado no existe." });
         }
 
         if (receiptRequestDto.WarehousePeriodId.HasValue)
@@ -174,25 +174,25 @@ public class ReceiptService : IReceiptService
 
             if (warehousePeriod is null)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "WarehousePeriodId does not reference an existing warehouse period." });
+                errors.Add(new Message { Type = MessageType.Error, Description = "El período de almacén seleccionado no existe." });
             }
             else if (warehousePeriod.IsClosed)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "This warehouse period is closed and cannot receive new movements." });
+                errors.Add(new Message { Type = MessageType.Error, Description = "Este período de almacén está cerrado y ya no admite nuevos movimientos." });
             }
         }
 
         if (receiptRequestDto.ReceiptTypeId.HasValue &&
             !await _unitOfWork.Repository<ReceiptType>().Query().AnyAsync(r => r.ReceiptTypeId == receiptRequestDto.ReceiptTypeId.Value))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "ReceiptTypeId does not reference an existing receipt type." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El tipo de entrada seleccionado no existe." });
         }
 
         foreach (var line in receiptRequestDto.Details)
         {
             if (!await _unitOfWork.Repository<Product>().Query().AnyAsync(p => p.ProductId == line.ProductId))
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = $"ProductId {line.ProductId} does not reference an existing product." });
+                errors.Add(new Message { Type = MessageType.Error, Description = $"El producto con ID {line.ProductId} no existe." });
             }
         }
 
@@ -249,7 +249,7 @@ public class ReceiptService : IReceiptService
         return new ResponsePost
         {
             Id = receipt.ReceiptId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Receipt created successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Entrada registrada correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }
@@ -262,7 +262,7 @@ public class ReceiptService : IReceiptService
             return new ResponseGetObject
             {
                 Data = new(),
-                Messages = [new Message { Type = MessageType.Error, Description = "Issue not found or voided." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la salida, o ya fue anulada." }],
                 StatusCode = HttpStatusCode.NotFound
             };
         }
@@ -312,19 +312,19 @@ public class ReceiptService : IReceiptService
         var issue = await _unitOfWork.Repository<Issue>().GetByIdAsync(receiptReturnRequestDto.IssueId);
         if (issue is null || issue.IsVoided)
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "IssueId does not reference an existing, non-voided issue." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "La salida indicada no existe o ya fue anulada." });
             return new ResponsePost { Id = 0, Messages = errors.ToArray(), StatusCode = HttpStatusCode.BadRequest };
         }
 
         if (issue.WarehouseId is null)
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "The original issue has no warehouse assigned." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "La salida original no tiene un almacén asignado." });
             return new ResponsePost { Id = 0, Messages = errors.ToArray(), StatusCode = HttpStatusCode.BadRequest };
         }
 
         if (!await _unitOfWork.Repository<ReceiptType>().Query().AnyAsync(r => r.ReceiptTypeId == receiptReturnRequestDto.ReceiptTypeId))
         {
-            errors.Add(new Message { Type = MessageType.Error, Description = "ReceiptTypeId does not reference an existing receipt type." });
+            errors.Add(new Message { Type = MessageType.Error, Description = "El tipo de entrada seleccionado no existe." });
         }
 
         var issueDetails = await _unitOfWork.Repository<IssueDetail>().Query()
@@ -343,7 +343,7 @@ public class ReceiptService : IReceiptService
         {
             if (!issueDetailsByProduct.TryGetValue(line.ProductId, out var issueDetail))
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = $"ProductId {line.ProductId} was not part of the original issue." });
+                errors.Add(new Message { Type = MessageType.Error, Description = $"El producto con ID {line.ProductId} no formaba parte de la salida original." });
                 continue;
             }
 
@@ -352,7 +352,7 @@ public class ReceiptService : IReceiptService
 
             if (line.Quantity > returnable)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = $"ProductId {line.ProductId}: cannot return {line.Quantity}, only {returnable} remain returnable." });
+                errors.Add(new Message { Type = MessageType.Error, Description = $"El producto con ID {line.ProductId}: no se puede devolver {line.Quantity}, solo quedan {returnable} disponibles para devolver." });
             }
         }
 
@@ -406,7 +406,7 @@ public class ReceiptService : IReceiptService
         return new ResponsePost
         {
             Id = receipt.ReceiptId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Return registered successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Devolución registrada correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }

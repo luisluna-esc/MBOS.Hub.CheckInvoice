@@ -142,7 +142,7 @@ public class IssueVoidRequestService : IIssueVoidRequestService
         return new ResponsePost
         {
             Id = request.IssueVoidRequestId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Void request submitted successfully." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Solicitud de anulación enviada correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
     }
@@ -159,7 +159,7 @@ public class IssueVoidRequestService : IIssueVoidRequestService
 
         if (request.Status != "pending")
         {
-            return OnlyPendingResponse(id, request.Status, "approved");
+            return OnlyPendingResponse(id, request.Status, "aprobar");
         }
 
         var issueRepository = _unitOfWork.Repository<Issue>();
@@ -170,7 +170,7 @@ public class IssueVoidRequestService : IIssueVoidRequestService
             return new ResponsePost
             {
                 Id = id,
-                Messages = [new Message { Type = MessageType.Error, Description = "The issue no longer exists or is already voided." }],
+                Messages = [new Message { Type = MessageType.Error, Description = "La salida ya no existe o ya fue anulada." }],
                 StatusCode = HttpStatusCode.BadRequest
             };
         }
@@ -207,7 +207,7 @@ public class IssueVoidRequestService : IIssueVoidRequestService
         return new ResponsePost
         {
             Id = request.IssueVoidRequestId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Void request approved. The issue was voided and its stock restored." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Solicitud aprobada. La salida fue anulada y su stock devuelto." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -224,7 +224,7 @@ public class IssueVoidRequestService : IIssueVoidRequestService
 
         if (request.Status != "pending")
         {
-            return OnlyPendingResponse(id, request.Status, "rejected");
+            return OnlyPendingResponse(id, request.Status, "rechazar");
         }
 
         request.Status = "rejected";
@@ -238,7 +238,7 @@ public class IssueVoidRequestService : IIssueVoidRequestService
         return new ResponsePost
         {
             Id = request.IssueVoidRequestId,
-            Messages = [new Message { Type = MessageType.Success, Description = "Void request rejected." }],
+            Messages = [new Message { Type = MessageType.Success, Description = "Solicitud de anulación rechazada." }],
             StatusCode = HttpStatusCode.OK
         };
     }
@@ -246,14 +246,22 @@ public class IssueVoidRequestService : IIssueVoidRequestService
     private static ResponsePost NotFoundResponse(long id) => new()
     {
         Id = id,
-        Messages = [new Message { Type = MessageType.Error, Description = "Void request not found." }],
+        Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la solicitud de anulación." }],
         StatusCode = HttpStatusCode.NotFound
     };
 
     private static ResponsePost OnlyPendingResponse(long id, string currentStatus, string attemptedAction) => new()
     {
         Id = id,
-        Messages = [new Message { Type = MessageType.Error, Description = $"Only pending void requests can be {attemptedAction}. Current status: '{currentStatus}'." }],
+        Messages = [new Message { Type = MessageType.Error, Description = $"Solo se pueden {attemptedAction} solicitudes pendientes. Estado actual: {VoidRequestStatusLabel(currentStatus)}." }],
         StatusCode = HttpStatusCode.BadRequest
+    };
+
+    private static string VoidRequestStatusLabel(string status) => status switch
+    {
+        "pending" => "Pendiente",
+        "approved" => "Aprobada",
+        "rejected" => "Rechazada",
+        _ => status
     };
 }

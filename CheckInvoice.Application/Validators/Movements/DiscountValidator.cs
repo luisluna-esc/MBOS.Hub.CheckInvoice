@@ -10,17 +10,17 @@ public class DiscountValidator : AbstractValidator<DiscountDto>
     public DiscountValidator()
     {
         RuleFor(x => x.SourceTable)
-            .NotEmpty().WithMessage("SourceTable is required.")
+            .NotEmpty().WithMessage("Debes indicar el origen del descuento.")
             .Must(value => ValidSourceTables.Contains(value))
-            .WithMessage($"SourceTable must be one of: {string.Join(", ", ValidSourceTables)}.");
+            .WithMessage("El origen del descuento no es válido.");
 
         RuleFor(x => x.SourceId)
-            .GreaterThan(0).WithMessage("SourceId is required.");
+            .GreaterThan(0).WithMessage("Debes indicar el registro de origen.");
 
         RuleFor(x => x.Amount)
-            .GreaterThan(0).WithMessage("Amount must be greater than zero.");
+            .GreaterThan(0).WithMessage("El monto debe ser mayor a cero.");
 
         RuleFor(x => x.Description)
-            .MaximumLength(255).WithMessage("Description must not exceed 255 characters.");
+            .MaximumLength(255).WithMessage("La descripción no puede superar los 255 caracteres.");
     }
 }
