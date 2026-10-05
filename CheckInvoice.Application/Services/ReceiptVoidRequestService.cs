@@ -59,7 +59,7 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
             reviewed_at AS "ReviewedAt",
             review_notes AS "ReviewNotes",
             total_records AS "TotalRecords"
-        FROM sp_get_receipt_void_requests({0}::bigint, {1}::bigint, {2}::varchar, {3}::bigint, {4}::int, {5}::int)
+        FROM sp_get_receipt_void_requests({0}::bigint, {1}::bigint, {2}::varchar, {3}::bigint, {4}::int, {5}::int, {6}::bigint, {7}::varchar, {8}::date, {9}::date)
         """;
 
     public async Task<ResponseGetObject> GetAllVoidRequests(PaginationQueryFilter paginationQueryFilter, ReceiptVoidRequestQueryFilter receiptVoidRequestQueryFilter)
@@ -74,7 +74,11 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
             (object?)receiptVoidRequestQueryFilter.Status ?? DBNull.Value,
             (object?)receiptVoidRequestQueryFilter.RequestedBy ?? DBNull.Value,
             pageNumber,
-            pageSize);
+            pageSize,
+            (object?)receiptVoidRequestQueryFilter.VoidReasonId ?? DBNull.Value,
+            (object?)receiptVoidRequestQueryFilter.RequestedByName ?? DBNull.Value,
+            (object?)receiptVoidRequestQueryFilter.DateFrom?.Date ?? DBNull.Value,
+            (object?)receiptVoidRequestQueryFilter.DateTo?.Date ?? DBNull.Value);
 
         var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
 

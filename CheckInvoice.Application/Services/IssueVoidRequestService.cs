@@ -61,7 +61,7 @@ public class IssueVoidRequestService : IIssueVoidRequestService
             reviewed_at AS "ReviewedAt",
             review_notes AS "ReviewNotes",
             total_records AS "TotalRecords"
-        FROM sp_get_issue_void_requests({0}::bigint, {1}::bigint, {2}::varchar, {3}::bigint, {4}::int, {5}::int)
+        FROM sp_get_issue_void_requests({0}::bigint, {1}::bigint, {2}::varchar, {3}::bigint, {4}::int, {5}::int, {6}::bigint, {7}::varchar, {8}::date, {9}::date)
         """;
 
     public async Task<ResponseGetObject> GetAllVoidRequests(PaginationQueryFilter paginationQueryFilter, IssueVoidRequestQueryFilter issueVoidRequestQueryFilter)
@@ -80,7 +80,11 @@ public class IssueVoidRequestService : IIssueVoidRequestService
             (object?)issueVoidRequestQueryFilter.Status ?? DBNull.Value,
             (object?)issueVoidRequestQueryFilter.RequestedBy ?? DBNull.Value,
             pageNumber,
-            pageSize);
+            pageSize,
+            (object?)issueVoidRequestQueryFilter.VoidReasonId ?? DBNull.Value,
+            (object?)issueVoidRequestQueryFilter.RequestedByName ?? DBNull.Value,
+            (object?)issueVoidRequestQueryFilter.DateFrom?.Date ?? DBNull.Value,
+            (object?)issueVoidRequestQueryFilter.DateTo?.Date ?? DBNull.Value);
 
         var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
 

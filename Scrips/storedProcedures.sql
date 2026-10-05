@@ -414,13 +414,19 @@ $$;
 -- separadas (página + 7 diccionarios: salidas, clientes vía party, nombres de almacén,
 -- totales por salida, motivos de anulación, nombres de usuario solicitante/revisor). Ahora
 -- es una sola consulta con joins.
+DROP FUNCTION IF EXISTS sp_get_issue_void_requests(BIGINT, BIGINT, VARCHAR, BIGINT, INT, INT);
+DROP FUNCTION IF EXISTS sp_get_issue_void_requests(BIGINT, BIGINT, VARCHAR, BIGINT, INT, INT, BIGINT, VARCHAR, DATE, DATE);
 CREATE OR REPLACE FUNCTION sp_get_issue_void_requests(
     p_issue_void_request_id BIGINT,
     p_issue_id BIGINT,
     p_status VARCHAR,
     p_requested_by BIGINT,
     p_page_number INT,
-    p_page_size INT
+    p_page_size INT,
+    p_void_reason_id BIGINT DEFAULT NULL,
+    p_requested_by_name VARCHAR DEFAULT NULL,
+    p_date_from DATE DEFAULT NULL,
+    p_date_to DATE DEFAULT NULL
 )
 RETURNS TABLE (
     issue_void_request_id BIGINT,
@@ -481,6 +487,11 @@ AS $$
       AND (p_issue_id IS NULL OR vr.issue_id = p_issue_id)
       AND (p_status IS NULL OR vr.status = p_status)
       AND (p_requested_by IS NULL OR vr.requested_by = p_requested_by)
+      AND (p_void_reason_id IS NULL OR vr.void_reason_id = p_void_reason_id)
+      AND (p_requested_by_name IS NULL OR (rqu.first_name || ' ' || rqu.last_name) ILIKE '%' || p_requested_by_name || '%')
+      -- Rango sobre la fecha de la solicitud (no la del documento); p_date_to es inclusivo.
+      AND (p_date_from IS NULL OR vr.requested_at >= p_date_from)
+      AND (p_date_to IS NULL OR vr.requested_at < p_date_to + 1)
     ORDER BY vr.requested_at DESC
     LIMIT p_page_size OFFSET (p_page_number - 1) * p_page_size;
 $$;
@@ -488,13 +499,19 @@ $$;
 -- Mismo patrón que sp_get_issue_void_requests, pero para Entradas: el proveedor viene
 -- directo de supplier.legal_name (sin pasar por party) y el total ya está en receipt.invoice_total
 -- (no hace falta una suma lateral de receipt_detail como con issue_detail).
+DROP FUNCTION IF EXISTS sp_get_receipt_void_requests(BIGINT, BIGINT, VARCHAR, BIGINT, INT, INT);
+DROP FUNCTION IF EXISTS sp_get_receipt_void_requests(BIGINT, BIGINT, VARCHAR, BIGINT, INT, INT, BIGINT, VARCHAR, DATE, DATE);
 CREATE OR REPLACE FUNCTION sp_get_receipt_void_requests(
     p_receipt_void_request_id BIGINT,
     p_receipt_id BIGINT,
     p_status VARCHAR,
     p_requested_by BIGINT,
     p_page_number INT,
-    p_page_size INT
+    p_page_size INT,
+    p_void_reason_id BIGINT DEFAULT NULL,
+    p_requested_by_name VARCHAR DEFAULT NULL,
+    p_date_from DATE DEFAULT NULL,
+    p_date_to DATE DEFAULT NULL
 )
 RETURNS TABLE (
     receipt_void_request_id BIGINT,
@@ -549,6 +566,11 @@ AS $$
       AND (p_receipt_id IS NULL OR vr.receipt_id = p_receipt_id)
       AND (p_status IS NULL OR vr.status = p_status)
       AND (p_requested_by IS NULL OR vr.requested_by = p_requested_by)
+      AND (p_void_reason_id IS NULL OR vr.void_reason_id = p_void_reason_id)
+      AND (p_requested_by_name IS NULL OR (rqu.first_name || ' ' || rqu.last_name) ILIKE '%' || p_requested_by_name || '%')
+      -- Rango sobre la fecha de la solicitud (no la del documento); p_date_to es inclusivo.
+      AND (p_date_from IS NULL OR vr.requested_at >= p_date_from)
+      AND (p_date_to IS NULL OR vr.requested_at < p_date_to + 1)
     ORDER BY vr.requested_at DESC
     LIMIT p_page_size OFFSET (p_page_number - 1) * p_page_size;
 $$;

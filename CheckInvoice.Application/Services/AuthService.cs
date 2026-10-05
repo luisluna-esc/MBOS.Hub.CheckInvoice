@@ -204,6 +204,7 @@ public class AuthService : IAuthService
             AppUserId = appUser.AppUserId,
             Username = appUser.Username,
             Email = appUser.Email,
+            FullName = $"{appUser.FirstName} {appUser.LastName}".Trim(),
             AccessToken = accessToken,
             AccessTokenExpiresAt = accessTokenExpiresAt,
             RefreshToken = refreshTokenValue,

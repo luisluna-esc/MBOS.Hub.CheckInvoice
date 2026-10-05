@@ -64,3 +64,11 @@ INSERT INTO warehouse (name, is_active) VALUES
 ('ALMACEN CENTRAL MBON', TRUE), ('ALMACEN CENTRAL UB', TRUE), ('ALMACEN CENTRAL MOB', TRUE),
 ('ALMACEN CENTRAL MBC', TRUE), ('ALMACEN CENTRAL MBOS', TRUE)
 ON CONFLICT DO NOTHING;
+
+-- Casos especiales de facturación (códigos del SIN que reemplazan al NIT real del cliente).
+-- 99001 no tiene nombre fijo: el formulario de Cliente deja escribir el nombre del extranjero.
+INSERT INTO special_case (code, name) VALUES
+('99001', 'Extranjeros no inscritos'),
+('99002', 'Control Tributario'),
+('99003', 'Ventas Menores')
+ON CONFLICT (code) DO NOTHING;
