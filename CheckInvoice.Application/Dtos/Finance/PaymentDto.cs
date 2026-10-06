@@ -10,4 +10,7 @@ public class PaymentDto
     public string? PaymentMethod { get; set; }
     public string? Notes { get; set; }
     public long? CreatedById { get; set; }
+    // Reparto por producto. Si la cuenta tiene salida es obligatorio y Amount se calcula como su
+    // suma; si la cuenta se creó a mano (sin salida) va vacío y se usa Amount.
+    public List<PaymentDetailRequestDto> Details { get; set; } = [];
 }

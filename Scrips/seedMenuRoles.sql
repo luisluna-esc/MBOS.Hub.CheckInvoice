@@ -57,7 +57,7 @@ INSERT INTO menu_role (menu_id, role_id)
 SELECT m.menu_id, r.role_id
 FROM menu m, role r
 WHERE m.route = '/account-receivables'
-  AND r.name IN ('Auxiliar Contador', 'Contador', 'Tesorero', 'M-BOS')
+  AND r.name IN ('Auxiliar Contador', 'Contador', 'Tesorero', 'M-BOS', 'Caja')
 ON CONFLICT DO NOTHING;
 
 -- Pastores: gestión administrativa (edición, otorgar/resetear acceso al portal), no es para

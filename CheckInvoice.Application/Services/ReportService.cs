@@ -18,7 +18,7 @@ using QuestPDF.Infrastructure;
 
 namespace CheckInvoice.Application.Services;
 
-public class ReportService : IReportService
+public partial class ReportService : IReportService
 {
     private const int MonthsBack = 6;
     private static readonly CultureInfo ReportCulture = new("es-ES");
@@ -2662,11 +2662,93 @@ public class ReportService : IReportService
             (object?)filter.DateTo ?? DBNull.Value);
     }
 
+    // Una fila por producto de cada salida en cartera, con lo que Caja registró para ese producto
+    // (payment_detail). Mismo formato que Salidas de Almacén, pero agrupado por cliente:
+    // la categoría del producto no le sirve a quien cobra. Cada fila tiene sus propios montos,
+    // así los subtotales suman bien.
+    private sealed record ReceivableProductRow(
+        AccountReceivablesReportRowDto Account,
+        string? Code,
+        string Name,
+        string? UnitMeasure,
+        string Department,
+        string SubDepartment,
+        decimal Quantity,
+        decimal UnitCost,
+        decimal TotalCost,
+        decimal Paid)
+    {
+        public decimal Balance => Math.Max(TotalCost - Paid, 0);
+    }
+
+    private async Task<List<ReceivableProductRow>> GetReceivableProductRowsAsync(List<AccountReceivablesReportRowDto> accounts)
+    {
+        var issueIds = accounts.Where(a => a.IssueId.HasValue).Select(a => a.IssueId!.Value).Distinct().ToList();
+
+        var lines = await (
+                from d in _unitOfWork.Repository<IssueDetail>().Query()
+                join p in _unitOfWork.Repository<Product>().Query() on d.ProductId equals p.ProductId
+                join dep in _unitOfWork.Repository<Department>().Query() on p.DepartmentId equals (long?)dep.DepartmentId into deps
+                from dep in deps.DefaultIfEmpty()
+                join sub in _unitOfWork.Repository<SubDepartment>().Query() on p.SubDepartmentId equals (long?)sub.SubDepartmentId into subs
+                from sub in subs.DefaultIfEmpty()
+                join mt in _unitOfWork.Repository<MediaType>().Query() on p.MediaTypeId equals (long?)mt.MediaTypeId into mts
+                from mt in mts.DefaultIfEmpty()
+                where issueIds.Contains(d.IssueId)
+                orderby d.IssueDetailId
+                select new
+                {
+                    d.IssueDetailId,
+                    d.IssueId,
+                    p.Code,
+                    p.Name,
+                    UnitMeasure = mt == null ? null : mt.Name,
+                    Department = dep == null ? null : dep.Name,
+                    SubDepartment = sub == null ? null : sub.Name,
+                    d.Quantity,
+                    d.UnitCost,
+                    d.TotalCost
+                })
+            .ToListAsync();
+
+        var issueDetailIds = lines.Select(l => l.IssueDetailId).ToList();
+        var paidByLine = await _unitOfWork.Repository<PaymentDetail>().Query()
+            .Where(pd => issueDetailIds.Contains(pd.IssueDetailId))
+            .GroupBy(pd => pd.IssueDetailId)
+            .Select(g => new { IssueDetailId = g.Key, Paid = g.Sum(pd => pd.Amount) })
+            .ToDictionaryAsync(x => x.IssueDetailId, x => x.Paid);
+
+        var linesByIssue = lines.GroupBy(l => l.IssueId).ToDictionary(g => g.Key, g => g.ToList());
+
+        var result = new List<ReceivableProductRow>();
+        foreach (var account in accounts)
+        {
+            if (account.IssueId.HasValue && linesByIssue.TryGetValue(account.IssueId.Value, out var issueLines))
+            {
+                result.AddRange(issueLines.Select(l => new ReceivableProductRow(
+                    account, l.Code, l.Name, l.UnitMeasure,
+                    l.Department ?? "(Sin categoría)", l.SubDepartment ?? "(Sin subcategoría)",
+                    l.Quantity, l.UnitCost, l.TotalCost, paidByLine.GetValueOrDefault(l.IssueDetailId))));
+            }
+            else
+            {
+                // Cuenta creada a mano, sin salida: una sola fila con el monto de la cuenta.
+                result.Add(new ReceivableProductRow(
+                    account, null, account.ProductNames ?? "(Cuenta sin productos)", null,
+                    "(Sin categoría)", "(Sin subcategoría)",
+                    0, 0, account.TotalAmount, account.TotalAmount - account.OutstandingBalance));
+            }
+        }
+
+        return result;
+    }
+
     public async Task<byte[]> GenerateAccountReceivablesReportPdf(AccountReceivablesReportQueryFilter filter)
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
-        var rows = await GetAccountReceivablesReport(filter);
+        var accounts = await GetAccountReceivablesReport(filter);
+        var productRows = await GetReceivableProductRowsAsync(accounts);
 
         var clientName = "Todos los clientes";
         if (filter.ClientId.HasValue)
@@ -2702,23 +2784,18 @@ public class ReportService : IReportService
             _ => "Todo el historial"
         };
 
-        var pending = rows.Where(r => r.Status != "paid").ToList();
-        var totalOutstanding = pending.Sum(r => r.OutstandingBalance);
-        var totalPortfolio = rows.Sum(r => r.TotalAmount);
+        var clients = productRows
+            .GroupBy(r => r.Account.ClientName ?? "(Sin cliente)")
+            .OrderBy(g => g.Key)
+            .ToList();
 
-        // Un producto por fila (el SP los trae juntos en product_names): con 10 o 20 productos
-        // en una sola celda la fila crecía sin control. Los datos de la cuenta se repiten en cada
-        // fila de sus productos; los totales siguen sumando por cuenta, no por fila.
-        var issueIds = rows.Where(r => r.IssueId.HasValue).Select(r => r.IssueId!.Value).Distinct().ToList();
-        var productLinesByIssue = (await (
-                from d in _unitOfWork.Repository<IssueDetail>().Query()
-                join p in _unitOfWork.Repository<Product>().Query() on d.ProductId equals p.ProductId
-                where issueIds.Contains(d.IssueId)
-                orderby d.IssueDetailId
-                select new { d.IssueId, p.Name, d.Quantity })
-            .ToListAsync())
-            .GroupBy(x => x.IssueId)
-            .ToDictionary(g => g.Key, g => g.Select(x => (Name: x.Name, Quantity: (decimal?)x.Quantity)).ToList());
+        const int leadColumns = 6;
+        const int totalColumns = leadColumns + 6;
+
+        var pendingAccounts = accounts.Count(a => a.Status != "paid");
+        var grandTotal = productRows.Sum(r => r.TotalCost);
+        var grandPaid = productRows.Sum(r => r.Paid);
+        var grandBalance = productRows.Sum(r => r.Balance);
 
         var document = Document.Create(container =>
         {
@@ -2726,7 +2803,7 @@ public class ReportService : IReportService
             {
                 page.Size(PageSizes.Letter.Landscape());
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(9));
+                page.DefaultTextStyle(x => x.FontSize(7));
 
                 page.Header().Column(column =>
                 {
@@ -2755,66 +2832,92 @@ public class ReportService : IReportService
                     {
                         table.ColumnsDefinition(columns =>
                         {
-                            columns.RelativeColumn(1.6f);
-                            columns.RelativeColumn(0.8f);
-                            columns.RelativeColumn(1);
-                            columns.RelativeColumn(1);
-                            columns.RelativeColumn(2.1f);
-                            columns.RelativeColumn(0.6f);
-                            columns.RelativeColumn(0.9f);
-                            columns.RelativeColumn(0.9f);
-                            columns.RelativeColumn(1);
-                            columns.RelativeColumn(1);
+                            columns.ConstantColumn(38);
+                            columns.ConstantColumn(44);
+                            columns.ConstantColumn(44);
+                            columns.ConstantColumn(34);
+                            columns.RelativeColumn(2);
+                            columns.ConstantColumn(42);
+                            columns.ConstantColumn(40);
+                            columns.ConstantColumn(44);
+                            columns.ConstantColumn(48);
+                            columns.ConstantColumn(48);
+                            columns.ConstantColumn(48);
+                            columns.ConstantColumn(52);
                         });
 
                         table.Header(header =>
                         {
-                            header.Cell().Element(HeaderCell).Text("Cliente");
                             header.Cell().Element(HeaderCell).Text("N° Salida");
                             header.Cell().Element(HeaderCell).Text("Fecha");
                             header.Cell().Element(HeaderCell).Text("Fecha\nLímite");
-                            header.Cell().Element(HeaderCell).Text("Producto");
-                            header.Cell().Element(HeaderCell).AlignRight().Text("Cant.");
-                            header.Cell().Element(HeaderCell).AlignRight().Text("Total");
-                            header.Cell().Element(HeaderCell).AlignRight().Text("Pagos");
-                            header.Cell().Element(HeaderCell).AlignRight().Text("Saldo\nPendiente");
+                            header.Cell().Element(HeaderCell).Text("Código");
+                            header.Cell().Element(HeaderCell).Text("Descripción");
+                            header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
+                            header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
+                            header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
+                            header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nTotal");
+                            header.Cell().Element(HeaderCell).AlignRight().Text("Pagado");
+                            header.Cell().Element(HeaderCell).AlignRight().Text("Saldo");
                             header.Cell().Element(HeaderCell).AlignCenter().Text("Estado");
                         });
 
-                        foreach (var row in rows)
+                        void TotalsRow(Func<IContainer, IContainer> style, string label, decimal quantity, decimal total, decimal paid, decimal balance)
                         {
-                            var productLines = row.IssueId.HasValue && productLinesByIssue.TryGetValue(row.IssueId.Value, out var lines)
-                                ? lines
-                                : [(Name: row.ProductNames ?? "—", Quantity: (decimal?)null)];
-
-                            foreach (var product in productLines)
-                            {
-                                table.Cell().Element(BodyCell).Text(row.ClientName ?? "—");
-                                table.Cell().Element(BodyCell).Text(row.IssueId.HasValue ? row.IssueId.Value.ToString().PadLeft(5, '0') : "—");
-                                table.Cell().Element(BodyCell).Text(row.IssueDate.HasValue ? row.IssueDate.Value.ToString("dd/MM/yyyy") : "—");
-                                table.Cell().Element(BodyCell).Text(row.DueDate.HasValue ? row.DueDate.Value.ToString("dd/MM/yyyy") : "—");
-                                table.Cell().Element(BodyCell).Text(product.Name);
-                                table.Cell().Element(BodyCell).AlignRight().Text(product.Quantity.HasValue ? product.Quantity.Value.ToString("0.##", ReportCulture) : "—");
-                                table.Cell().Element(BodyCell).AlignRight().Text(row.TotalAmount.ToString("N2", ReportCulture));
-                                table.Cell().Element(BodyCell).AlignRight().Text(row.PaidAmount.ToString("N2", ReportCulture));
-                                table.Cell().Element(BodyCell).AlignRight().Text(row.OutstandingBalance.ToString("N2", ReportCulture));
-                                table.Cell().Element(BodyCell).AlignCenter().Text(AccountReceivableStatusLabel(row.Status));
-                            }
+                            table.Cell().ColumnSpan(leadColumns).Element(style).AlignRight().Text(label).Bold();
+                            table.Cell().Element(style).AlignRight().Text(quantity.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(style).Text("");
+                            table.Cell().Element(style).AlignRight().Text(total.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(style).AlignRight().Text(paid.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(style).AlignRight().Text(balance.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(style).Text("");
                         }
 
-                        table.Cell().ColumnSpan(6).Element(CategoryTotalCell).AlignRight().Text("Total Cartera").Bold();
-                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(totalPortfolio.ToString("N2", ReportCulture)).Bold();
-                        table.Cell().Element(CategoryTotalCell).Text("");
-                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(totalOutstanding.ToString("N2", ReportCulture)).Bold();
-                        table.Cell().Element(CategoryTotalCell).Text("");
+                        foreach (var client in clients)
+                        {
+                            table.Cell().ColumnSpan(totalColumns).Element(c => c.PaddingTop(8).PaddingBottom(2))
+                                .Text(client.Key).Bold().FontSize(10);
+
+                            decimal qty = 0m, total = 0m, paid = 0m, balance = 0m;
+
+                            foreach (var row in client.OrderBy(r => r.Account.IssueId).ThenBy(r => r.Name))
+                            {
+                                var account = row.Account;
+                                table.Cell().Element(BodyCell).Text(account.IssueId.HasValue ? account.IssueId.Value.ToString().PadLeft(5, '0') : "—");
+                                table.Cell().Element(BodyCell).Text(account.IssueDate.HasValue ? account.IssueDate.Value.ToString("dd/MM/yyyy") : "—");
+                                table.Cell().Element(BodyCell).Text(account.DueDate.HasValue ? account.DueDate.Value.ToString("dd/MM/yyyy") : "—");
+                                table.Cell().Element(BodyCell).Text(row.Code ?? "");
+                                table.Cell().Element(BodyCell).Text(row.Name);
+                                table.Cell().Element(BodyCell).Text(row.UnitMeasure ?? "");
+                                table.Cell().Element(BodyCell).AlignRight().Text(row.Quantity.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(row.UnitCost.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(row.TotalCost.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(row.Paid.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(row.Balance.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignCenter().Text(AccountReceivableStatusLabel(account.Status));
+
+                                qty += row.Quantity;
+                                total += row.TotalCost;
+                                paid += row.Paid;
+                                balance += row.Balance;
+                            }
+
+                            TotalsRow(SubtotalCell, "Total cliente", qty, total, paid, balance);
+                        }
+
+                        if (clients.Count > 0)
+                        {
+                            TotalsRow(CategoryTotalCell, "TOTAL GENERAL", productRows.Sum(r => r.Quantity), grandTotal, grandPaid, grandBalance);
+                        }
                     });
 
                     mainColumn.Item().PaddingTop(8).Row(row =>
                     {
                         row.Spacing(10);
-                        row.RelativeItem().Element(c => SummaryTextCard(c, "Total Pendiente", totalOutstanding.ToString("N2", ReportCulture)));
-                        row.RelativeItem().Element(c => SummaryTextCard(c, "Cuentas Pendientes", pending.Count.ToString()));
-                        row.RelativeItem().Element(c => SummaryTextCard(c, "Total Cartera", totalPortfolio.ToString("N2", ReportCulture)));
+                        row.RelativeItem().Element(c => SummaryTextCard(c, "Total Cartera", grandTotal.ToString("N2", ReportCulture)));
+                        row.RelativeItem().Element(c => SummaryTextCard(c, "Total Pagado", grandPaid.ToString("N2", ReportCulture)));
+                        row.RelativeItem().Element(c => SummaryTextCard(c, "Total Pendiente", grandBalance.ToString("N2", ReportCulture)));
+                        row.RelativeItem().Element(c => SummaryTextCard(c, "Cuentas Pendientes", pendingAccounts.ToString()));
                     });
                 });
 

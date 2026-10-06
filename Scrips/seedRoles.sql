@@ -23,7 +23,8 @@ INSERT INTO role (name, description, is_active) VALUES
 ('Tesorero', 'Reportes y autorización de edición/eliminación de entradas y salidas', TRUE),
 ('Contador', 'Reportes, registro de entradas y salidas, y autorización de edición/eliminación', TRUE),
 ('Auxiliar Contador', 'Registro de entradas, salidas, transferencias, clientes, proveedores, productos y geografía; solicita ediciones/eliminaciones a Contador y Tesorero', TRUE),
-('Pastor', 'Autoservicio en el portal, acceso limitado a sus propios registros', TRUE)
+('Pastor', 'Autoservicio en el portal, acceso limitado a sus propios registros', TRUE),
+('Caja', 'Registra los depósitos de Cuentas por Cobrar, por producto', TRUE)
 ON CONFLICT DO NOTHING;
 
 -- M-BOS: acceso completo, es el superusuario.
@@ -57,4 +58,13 @@ SELECT r.role_id, p.permission_id, NOW()
 FROM role r
 CROSS JOIN permission p
 WHERE r.name = 'Pastor' AND p.code = 'visita'
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- Caja: "trabajo" para poder registrar depósitos. Lo que ve lo decide su menú (solo
+-- Cuentas por Cobrar, ver seedMenuRoles.sql), que administra M-BOS.
+INSERT INTO role_permission (role_id, permission_id, created_at)
+SELECT r.role_id, p.permission_id, NOW()
+FROM role r
+CROSS JOIN permission p
+WHERE r.name = 'Caja' AND p.code = 'trabajo'
 ON CONFLICT (role_id, permission_id) DO NOTHING;

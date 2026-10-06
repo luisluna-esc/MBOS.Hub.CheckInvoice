@@ -26,6 +26,15 @@ public class PaymentsController : ControllerBase
         return StatusCode((int)result.StatusCode, result);
     }
 
+    // Productos de la cuenta con lo pagado y lo que falta, para repartir un depósito.
+    [Authorize(Policy = "payment.view")]
+    [HttpGet("lines/{accountReceivableId:long}")]
+    public async Task<IActionResult> GetPaymentLines(long accountReceivableId)
+    {
+        var result = await _paymentService.GetPaymentLines(accountReceivableId);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
     [Authorize(Policy = "payment.create")]
     [HttpPost]
     public async Task<IActionResult> Insert([FromBody] PaymentDto paymentDto)

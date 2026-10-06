@@ -9,4 +9,5 @@ public interface IPaymentService
 {
     Task<ResponseGetObject> GetAllPayments(PaginationQueryFilter paginationQueryFilter, PaymentQueryFilter paymentQueryFilter);
     Task<ResponsePost> InsertPayment(PaymentDto paymentDto);
+    Task<ResponseGetObject> GetPaymentLines(long accountReceivableId);
 }

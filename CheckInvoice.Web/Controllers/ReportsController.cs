@@ -49,6 +49,15 @@ public class ReportsController : ControllerBase
 
     [Authorize(Policy = "report.view")]
     [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("stock/excel")]
+    public async Task<IActionResult> GetStockReportExcel([FromQuery] StockReportQueryFilter filter)
+    {
+        var excelBytes = await _reportService.GenerateStockReportExcel(filter);
+        return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "inventario-general.xlsx");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
     [HttpGet("inventory-count-template/pdf")]
     public async Task<IActionResult> GetInventoryCountTemplatePdf([FromQuery] StockReportQueryFilter filter)
     {
@@ -76,6 +85,15 @@ public class ReportsController : ControllerBase
 
     [Authorize(Policy = "report.view")]
     [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("stock-by-department/excel")]
+    public async Task<IActionResult> GetStockByDepartmentReportExcel([FromQuery] StockByDepartmentReportQueryFilter filter)
+    {
+        var excelBytes = await _reportService.GenerateStockByDepartmentReportExcel(filter);
+        return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "inventario-por-departamento.xlsx");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
     [HttpGet("kardex")]
     public async Task<IActionResult> GetKardexReport([FromQuery] KardexReportQueryFilter filter)
     {
@@ -90,6 +108,15 @@ public class ReportsController : ControllerBase
     {
         var pdfBytes = await _reportService.GenerateKardexReportPdf(filter);
         return File(pdfBytes, "application/pdf", "kardex-fisico-valorado.pdf");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("kardex/excel")]
+    public async Task<IActionResult> GetKardexReportExcel([FromQuery] KardexReportQueryFilter filter)
+    {
+        var excelBytes = await _reportService.GenerateKardexReportExcel(filter);
+        return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "kardex-fisico-valorado.xlsx");
     }
 
     [Authorize(Policy = "report.view")]
@@ -112,6 +139,15 @@ public class ReportsController : ControllerBase
 
     [Authorize(Policy = "report.view")]
     [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("inventory-count/excel")]
+    public async Task<IActionResult> GetInventoryCountReportExcel([FromQuery] InventoryCountReportQueryFilter filter)
+    {
+        var excelBytes = await _reportService.GenerateInventoryCountReportExcel(filter);
+        return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "levantamiento-de-inventario.xlsx");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
     [HttpGet("issues")]
     public async Task<IActionResult> GetIssuesReport([FromQuery] IssuesReportQueryFilter filter)
     {
@@ -126,6 +162,15 @@ public class ReportsController : ControllerBase
     {
         var pdfBytes = await _reportService.GenerateIssuesReportPdf(filter);
         return File(pdfBytes, "application/pdf", "salidas-de-almacen.pdf");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("issues/excel")]
+    public async Task<IActionResult> GetIssuesReportExcel([FromQuery] IssuesReportQueryFilter filter)
+    {
+        var excelBytes = await _reportService.GenerateIssuesReportExcel(filter);
+        return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "salidas-de-almacen.xlsx");
     }
 
     [Authorize(Policy = "report.view")]
@@ -157,6 +202,15 @@ public class ReportsController : ControllerBase
     {
         var pdfBytes = await _reportService.GenerateReceiptsReportPdf(filter);
         return File(pdfBytes, "application/pdf", "ingresos-de-almacen.pdf");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("receipts/excel")]
+    public async Task<IActionResult> GetReceiptsReportExcel([FromQuery] ReceiptsReportQueryFilter filter)
+    {
+        var excelBytes = await _reportService.GenerateReceiptsReportExcel(filter);
+        return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "ingresos-de-almacen.xlsx");
     }
 
     [Authorize(Policy = "report.view")]
@@ -205,6 +259,15 @@ public class ReportsController : ControllerBase
 
     [Authorize(Policy = "report.view")]
     [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("kardex-by-product/excel")]
+    public async Task<IActionResult> GetKardexByProductReportExcel([FromQuery] KardexByProductReportQueryFilter filter)
+    {
+        var excelBytes = await _reportService.GenerateKardexByProductReportExcel(filter);
+        return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "kardex-por-material.xlsx");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
     [HttpGet("pastor-field/data")]
     public async Task<IActionResult> GetPastorFieldReportData([FromQuery] PastorFieldReportQueryFilter filter)
     {
@@ -223,6 +286,15 @@ public class ReportsController : ControllerBase
 
     [Authorize(Policy = "report.view")]
     [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("pastor-field/excel")]
+    public async Task<IActionResult> GetPastorFieldReportExcel([FromQuery] PastorFieldReportQueryFilter filter)
+    {
+        var excelBytes = await _reportService.GeneratePastorFieldReportExcel(filter);
+        return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "campo-pastor.xlsx");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
     [HttpGet("account-receivables/data")]
     public async Task<IActionResult> GetAccountReceivablesReport([FromQuery] AccountReceivablesReportQueryFilter filter)
     {
@@ -237,6 +309,15 @@ public class ReportsController : ControllerBase
     {
         var pdfBytes = await _reportService.GenerateAccountReceivablesReportPdf(filter);
         return File(pdfBytes, "application/pdf", "cuentas-por-cobrar.pdf");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("account-receivables/excel")]
+    public async Task<IActionResult> GetAccountReceivablesReportExcel([FromQuery] AccountReceivablesReportQueryFilter filter)
+    {
+        var excelBytes = await _reportService.GenerateAccountReceivablesReportExcel(filter);
+        return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "cuentas-por-cobrar.xlsx");
     }
 
     [Authorize(Policy = "report.view")]

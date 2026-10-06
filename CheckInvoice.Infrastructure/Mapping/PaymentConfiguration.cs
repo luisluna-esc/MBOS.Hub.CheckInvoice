@@ -42,5 +42,10 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 
         entity.Property(e => e.CreatedById)
               .HasColumnName("created_by");
+
+        entity.HasMany(e => e.Details)
+              .WithOne()
+              .HasForeignKey(d => d.PaymentId)
+              .OnDelete(DeleteBehavior.Cascade);
     }
 }

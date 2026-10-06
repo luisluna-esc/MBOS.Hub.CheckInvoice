@@ -621,6 +621,20 @@ CREATE TABLE payment (
     CONSTRAINT fk_payment_created_by FOREIGN KEY (created_by) REFERENCES app_user(app_user_id)
 );
 
+-- Reparto de cada depósito entre los productos de la salida (rol Caja, 2026-10-06).
+CREATE TABLE payment_detail (
+    payment_detail_id BIGSERIAL PRIMARY KEY,
+    payment_id BIGINT NOT NULL,
+    issue_detail_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+    CONSTRAINT fk_payment_detail_payment FOREIGN KEY (payment_id) REFERENCES payment(payment_id) ON DELETE CASCADE,
+    CONSTRAINT fk_payment_detail_issue_detail FOREIGN KEY (issue_detail_id) REFERENCES issue_detail(issue_detail_id),
+    CONSTRAINT fk_payment_detail_product FOREIGN KEY (product_id) REFERENCES product(product_id)
+);
+CREATE INDEX ix_payment_detail_payment ON payment_detail(payment_id);
+CREATE INDEX ix_payment_detail_issue_detail ON payment_detail(issue_detail_id);
+
 CREATE INDEX idx_payment_account_receivable ON payment(account_receivable_id);
 
 -- =====================================================================

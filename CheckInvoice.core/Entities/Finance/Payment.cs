@@ -10,4 +10,5 @@ public class Payment
     public string? PaymentMethod { get; set; }
     public string? Notes { get; set; }
     public long? CreatedById { get; set; }
+    public ICollection<PaymentDetail> Details { get; set; } = [];
 }

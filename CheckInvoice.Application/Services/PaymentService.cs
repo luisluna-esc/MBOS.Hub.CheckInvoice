@@ -1,9 +1,12 @@
+using System.Globalization;
 using System.Net;
 using CheckInvoice.Application.Dtos.Finance;
 using CheckInvoice.Application.Interfaces.Finance;
 using CheckInvoice.Application.Interfaces.Security;
 using CheckInvoice.core.Configuration;
 using CheckInvoice.core.Entities.Finance;
+using CheckInvoice.core.Entities.Movements;
+using CheckInvoice.core.Entities.Products;
 using CheckInvoice.core.Entities.ResponseApi.Details;
 using CheckInvoice.core.Entities.ResponseApi.DisplayFormat;
 using CheckInvoice.core.Interfaces;
@@ -16,6 +19,8 @@ namespace CheckInvoice.Application.Services;
 
 public class PaymentService : IPaymentService
 {
+    private static readonly CultureInfo MoneyCulture = new("es-ES");
+
     private readonly IUnitOfWork _unitOfWork;
     private readonly PaginationOptions _paginationOptions;
     private readonly IValidator<PaymentDto> _validator;
@@ -109,6 +114,57 @@ public class PaymentService : IPaymentService
             }
         }
 
+        // Depósito por producto: cada monto se asigna a una línea de la salida y no puede pasar
+        // de lo que falta pagar de esa línea. Sin salida (cuenta creada a mano) no hay productos
+        // y el depósito es un monto general, como antes.
+        var paymentDetails = new List<PaymentDetail>();
+        if (accountReceivable is not null && errors.Count == 0)
+        {
+            if (accountReceivable.IssueId.HasValue)
+            {
+                if (paymentDto.Details.Count == 0)
+                {
+                    errors.Add(new Message { Type = MessageType.Error, Description = "Indica cuánto se deposita de al menos un producto." });
+                }
+                else
+                {
+                    var lines = (await GetLinesForIssueAsync(accountReceivable.IssueId.Value))
+                        .ToDictionary(l => l.IssueDetailId);
+
+                    foreach (var detail in paymentDto.Details)
+                    {
+                        if (!lines.TryGetValue(detail.IssueDetailId, out var line))
+                        {
+                            errors.Add(new Message { Type = MessageType.Error, Description = "Uno de los productos no pertenece a la salida de esta cuenta." });
+                        }
+                        else if (detail.Amount > line.RemainingAmount)
+                        {
+                            errors.Add(new Message
+                            {
+                                Type = MessageType.Error,
+                                Description = $"{line.Name}: solo faltan {line.RemainingAmount.ToString("N2", MoneyCulture)} Bs."
+                            });
+                        }
+                        else
+                        {
+                            paymentDetails.Add(new PaymentDetail
+                            {
+                                IssueDetailId = line.IssueDetailId,
+                                ProductId = line.ProductId,
+                                Amount = detail.Amount
+                            });
+                        }
+                    }
+
+                    paymentDto.Amount = paymentDto.Details.Sum(d => d.Amount);
+                }
+            }
+            else if (paymentDto.Details.Count > 0)
+            {
+                errors.Add(new Message { Type = MessageType.Error, Description = "Esta cuenta no tiene productos: registra el monto total del depósito." });
+            }
+        }
+
         if (errors.Count > 0)
         {
             return new ResponsePost
@@ -141,7 +197,8 @@ public class PaymentService : IPaymentService
             PaymentDate = DateTime.UtcNow,
             PaymentMethod = paymentDto.PaymentMethod,
             Notes = paymentDto.Notes,
-            CreatedById = _currentUserService.AppUserId
+            CreatedById = _currentUserService.AppUserId,
+            Details = paymentDetails
         };
 
         await _unitOfWork.Repository<Payment>().AddAsync(payment);
@@ -176,6 +233,73 @@ public class PaymentService : IPaymentService
             Messages = [new Message { Type = MessageType.Success, Description = "Pago registrado correctamente." }],
             StatusCode = HttpStatusCode.Created
         };
+    }
+
+    public async Task<ResponseGetObject> GetPaymentLines(long accountReceivableId)
+    {
+        var accountReceivable = await _unitOfWork.Repository<AccountReceivable>().GetByIdAsync(accountReceivableId);
+        if (accountReceivable is null)
+        {
+            return new ResponseGetObject
+            {
+                Data = null,
+                Messages = [new Message { Type = MessageType.Error, Description = "La cuenta por cobrar seleccionada no existe." }],
+                StatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        var lines = accountReceivable.IssueId.HasValue
+            ? await GetLinesForIssueAsync(accountReceivable.IssueId.Value)
+            : [];
+
+        return new ResponseGetObject
+        {
+            Data = new PaymentLinesDto
+            {
+                AccountReceivableId = accountReceivable.AccountReceivableId,
+                OutstandingBalance = accountReceivable.OutstandingBalance,
+                HasProducts = lines.Count > 0,
+                Lines = lines
+            },
+            Messages = [],
+            StatusCode = HttpStatusCode.OK
+        };
+    }
+
+    // Cada producto (línea) de la salida vale su TotalCost, igual que el total de la cuenta por
+    // cobrar (IssueService lo arma como la suma de esas líneas). Lo pagado sale de payment_detail.
+    private async Task<List<PaymentLineDto>> GetLinesForIssueAsync(long issueId)
+    {
+        var lines = await (
+                from d in _unitOfWork.Repository<IssueDetail>().Query()
+                join p in _unitOfWork.Repository<Product>().Query() on d.ProductId equals p.ProductId
+                where d.IssueId == issueId
+                orderby d.IssueDetailId
+                select new PaymentLineDto
+                {
+                    IssueDetailId = d.IssueDetailId,
+                    ProductId = p.ProductId,
+                    Code = p.Code,
+                    Name = p.Name,
+                    Quantity = d.Quantity,
+                    TotalAmount = d.TotalCost
+                })
+            .ToListAsync();
+
+        var issueDetailIds = lines.Select(l => l.IssueDetailId).ToList();
+        var paidByLine = await _unitOfWork.Repository<PaymentDetail>().Query()
+            .Where(pd => issueDetailIds.Contains(pd.IssueDetailId))
+            .GroupBy(pd => pd.IssueDetailId)
+            .Select(g => new { IssueDetailId = g.Key, Paid = g.Sum(pd => pd.Amount) })
+            .ToDictionaryAsync(x => x.IssueDetailId, x => x.Paid);
+
+        foreach (var line in lines)
+        {
+            line.PaidAmount = paidByLine.GetValueOrDefault(line.IssueDetailId);
+            line.RemainingAmount = Math.Max(line.TotalAmount - line.PaidAmount, 0);
+        }
+
+        return lines;
     }
 
     private static PaymentDto ToDto(Payment payment) => new()
