@@ -130,6 +130,8 @@ AS $$
     -- "late" no es un valor guardado en account_receivable.status: se deriva comparando
     -- due_date contra hoy solo cuando el estado real todavía es 'pending'. Se calcula acá
     -- (una sola vez) para que la grilla, el filtro y el reporte usen siempre el mismo criterio.
+    -- "Hoy" es la fecha de Bolivia, no la de la zona del servidor (CURRENT_DATE): si el servidor
+    -- estuviera en UTC, después de las 20:00 la cuenta pasaría a retrasada 4 horas antes.
     SELECT
         a.account_receivable_id,
         a.issue_id,
@@ -143,7 +145,7 @@ AS $$
         a.due_date,
         CASE
             WHEN a.status = 'paid' THEN 'paid'
-            WHEN a.status = 'pending' AND a.due_date IS NOT NULL AND a.due_date < CURRENT_DATE THEN 'late'
+            WHEN a.status = 'pending' AND a.due_date IS NOT NULL AND a.due_date < (NOW() AT TIME ZONE 'America/La_Paz')::date THEN 'late'
             ELSE a.status
         END AS status,
         a.created_at,
@@ -161,7 +163,7 @@ AS $$
             OR (
                 CASE
                     WHEN a.status = 'paid' THEN 'paid'
-                    WHEN a.status = 'pending' AND a.due_date IS NOT NULL AND a.due_date < CURRENT_DATE THEN 'late'
+                    WHEN a.status = 'pending' AND a.due_date IS NOT NULL AND a.due_date < (NOW() AT TIME ZONE 'America/La_Paz')::date THEN 'late'
                     ELSE a.status
                 END
               ) = p_status
@@ -215,7 +217,7 @@ AS $$
         ar.due_date,
         CASE
             WHEN ar.status = 'paid' THEN 'paid'
-            WHEN ar.status = 'pending' AND ar.due_date IS NOT NULL AND ar.due_date < CURRENT_DATE THEN 'late'
+            WHEN ar.status = 'pending' AND ar.due_date IS NOT NULL AND ar.due_date < (NOW() AT TIME ZONE 'America/La_Paz')::date THEN 'late'
             ELSE ar.status
         END AS status
     FROM account_receivable ar
@@ -236,7 +238,7 @@ AS $$
             OR (
                 CASE
                     WHEN ar.status = 'paid' THEN 'paid'
-                    WHEN ar.status = 'pending' AND ar.due_date IS NOT NULL AND ar.due_date < CURRENT_DATE THEN 'late'
+                    WHEN ar.status = 'pending' AND ar.due_date IS NOT NULL AND ar.due_date < (NOW() AT TIME ZONE 'America/La_Paz')::date THEN 'late'
                     ELSE ar.status
                 END
               ) = p_status

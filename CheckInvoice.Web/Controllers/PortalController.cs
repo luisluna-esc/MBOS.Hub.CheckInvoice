@@ -18,6 +18,14 @@ public class PortalController : ControllerBase
     }
 
     [Authorize(Policy = "portal.account_receivable.view")]
+    [HttpGet("statement")]
+    public async Task<IActionResult> GetMyStatement()
+    {
+        var result = await _portalService.GetMyStatement();
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [Authorize(Policy = "portal.account_receivable.view")]
     [HttpGet("account-receivables")]
     public async Task<IActionResult> GetMyAccountReceivables([FromQuery] PaginationQueryFilter paginationQueryFilter)
     {

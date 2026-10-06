@@ -233,7 +233,7 @@ public partial class ReportService
             new("Fecha", r => r.IssueDate?.Date, DateFormat),
             new("Fecha límite", r => r.DueDate?.ToDateTime(TimeOnly.MinValue), DateFormat),
             new("Saldo pendiente", r => r.OutstandingBalance, MoneyFormat, Total: true),
-            new("Estado", r => r.Status == "paid" ? "Pagado" : "Pendiente")
+            new("Estado", r => AccountReceivableStatusLabel(r.Status))
         };
         var deliveryColumns = new List<ExcelColumn<PastorFieldDeliveryRowDto>>
         {
@@ -270,6 +270,7 @@ public partial class ReportService
 
         var statusLabel = filter.Status switch
         {
+            "open" => "Por cobrar (pendientes y con pago retrasado)",
             "pending" => "Pendientes",
             "late" => "Pago retrasado",
             "paid" => "Pagadas",

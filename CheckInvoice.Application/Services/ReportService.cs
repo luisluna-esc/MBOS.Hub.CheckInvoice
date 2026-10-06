@@ -2162,12 +2162,8 @@ public partial class ReportService : IReportService
     // storedProcedures.sql, que ya devuelve el estado efectivo) — este helper replica el mismo
     // criterio para el comprobante individual, que lee la entidad directo por EF en vez de
     // pasar por ese stored procedure.
-    private static string EffectiveAccountReceivableStatus(string status, DateOnly? dueDate) => status switch
-    {
-        "paid" => "paid",
-        "pending" when dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(BoliviaTime.Today) => "late",
-        _ => status
-    };
+    private static string EffectiveAccountReceivableStatus(string status, DateOnly? dueDate) =>
+        AccountReceivableStatus.Effective(status, dueDate);
 
     private static string AccountReceivableStatusLabel(string status) => status switch
     {
@@ -2432,6 +2428,12 @@ public partial class ReportService : IReportService
             (object?)filter.DateFrom ?? DBNull.Value,
             (object?)filter.DateTo ?? DBNull.Value);
 
+        // El SP devuelve el estado guardado; aquí se pasa al efectivo para mostrar "Pago retrasado".
+        foreach (var receivable in receivables)
+        {
+            receivable.Status = AccountReceivableStatus.Effective(receivable.Status, receivable.DueDate);
+        }
+
         var pending = receivables.Where(r => r.Status != "paid").ToList();
 
         return new PastorFieldReportDataDto
@@ -2534,7 +2536,7 @@ public partial class ReportService : IReportService
                                 table.Cell().Element(BodyCell).Text(row.IssueDate.HasValue ? row.IssueDate.Value.ToString("dd/MM/yyyy") : "—");
                                 table.Cell().Element(BodyCell).Text(row.DueDate.HasValue ? row.DueDate.Value.ToString("dd/MM/yyyy") : "—");
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.OutstandingBalance.ToString("N2", ReportCulture));
-                                table.Cell().Element(BodyCell).Text(row.Status == "paid" ? "Pagado" : "Pendiente");
+                                table.Cell().Element(BodyCell).Text(AccountReceivableStatusLabel(row.Status));
                             }
                         });
 
@@ -2652,14 +2654,20 @@ public partial class ReportService : IReportService
         FROM sp_get_account_receivables_report({0}::bigint, {1}::varchar, {2}::date, {3}::date)
         """;
 
+    // "open" (Por cobrar) no es un estado del SP: son las pendientes más las retrasadas, lo que
+    // todavía falta cobrar. Es el filtro por defecto del reporte, para que con muchos pastores
+    // no se genere al entrar el historial completo de cuentas ya pagadas.
     public async Task<List<AccountReceivablesReportRowDto>> GetAccountReceivablesReport(AccountReceivablesReportQueryFilter filter)
     {
-        return await _unitOfWork.SqlQueryAsync<AccountReceivablesReportRowDto>(
+        var onlyOpen = filter.Status == "open";
+        var rows = await _unitOfWork.SqlQueryAsync<AccountReceivablesReportRowDto>(
             GetAccountReceivablesReportSql,
             (object?)filter.ClientId ?? DBNull.Value,
-            (object?)filter.Status ?? DBNull.Value,
+            onlyOpen ? DBNull.Value : (object?)filter.Status ?? DBNull.Value,
             (object?)filter.DateFrom ?? DBNull.Value,
             (object?)filter.DateTo ?? DBNull.Value);
+
+        return onlyOpen ? rows.Where(r => r.Status != "paid").ToList() : rows;
     }
 
     // Una fila por producto de cada salida en cartera, con lo que Caja registró para ese producto
@@ -2763,6 +2771,7 @@ public partial class ReportService : IReportService
 
         var statusLabel = filter.Status switch
         {
+            "open" => "Por cobrar (pendientes y con pago retrasado)",
             "pending" => "Pendientes",
             "late" => "Pago retrasado",
             "paid" => "Pagadas",

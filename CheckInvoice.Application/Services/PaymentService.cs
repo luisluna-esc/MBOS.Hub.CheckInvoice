@@ -114,6 +114,17 @@ public class PaymentService : IPaymentService
             }
         }
 
+        // Con la fecha límite vencida la cuenta pasa a "Pago retrasado" (mismo criterio que
+        // sp_get_account_receivables) y ya no se cobra por Caja: se descuenta del sueldo.
+        if (accountReceivable is not null && AccountReceivableStatus.IsLate(accountReceivable.Status, accountReceivable.DueDate))
+        {
+            errors.Add(new Message
+            {
+                Type = MessageType.Error,
+                Description = "Esta cuenta tiene pago retrasado: ya no se registran depósitos, se descontará del sueldo."
+            });
+        }
+
         // Depósito por producto: cada monto se asigna a una línea de la salida y no puede pasar
         // de lo que falta pagar de esa línea. Sin salida (cuenta creada a mano) no hay productos
         // y el depósito es un monto general, como antes.
@@ -266,41 +277,8 @@ public class PaymentService : IPaymentService
         };
     }
 
-    // Cada producto (línea) de la salida vale su TotalCost, igual que el total de la cuenta por
-    // cobrar (IssueService lo arma como la suma de esas líneas). Lo pagado sale de payment_detail.
-    private async Task<List<PaymentLineDto>> GetLinesForIssueAsync(long issueId)
-    {
-        var lines = await (
-                from d in _unitOfWork.Repository<IssueDetail>().Query()
-                join p in _unitOfWork.Repository<Product>().Query() on d.ProductId equals p.ProductId
-                where d.IssueId == issueId
-                orderby d.IssueDetailId
-                select new PaymentLineDto
-                {
-                    IssueDetailId = d.IssueDetailId,
-                    ProductId = p.ProductId,
-                    Code = p.Code,
-                    Name = p.Name,
-                    Quantity = d.Quantity,
-                    TotalAmount = d.TotalCost
-                })
-            .ToListAsync();
-
-        var issueDetailIds = lines.Select(l => l.IssueDetailId).ToList();
-        var paidByLine = await _unitOfWork.Repository<PaymentDetail>().Query()
-            .Where(pd => issueDetailIds.Contains(pd.IssueDetailId))
-            .GroupBy(pd => pd.IssueDetailId)
-            .Select(g => new { IssueDetailId = g.Key, Paid = g.Sum(pd => pd.Amount) })
-            .ToDictionaryAsync(x => x.IssueDetailId, x => x.Paid);
-
-        foreach (var line in lines)
-        {
-            line.PaidAmount = paidByLine.GetValueOrDefault(line.IssueDetailId);
-            line.RemainingAmount = Math.Max(line.TotalAmount - line.PaidAmount, 0);
-        }
-
-        return lines;
-    }
+    private async Task<List<PaymentLineDto>> GetLinesForIssueAsync(long issueId) =>
+        (await ReceivableLines.ForIssuesAsync(_unitOfWork, [issueId])).GetValueOrDefault(issueId, []);
 
     private static PaymentDto ToDto(Payment payment) => new()
     {

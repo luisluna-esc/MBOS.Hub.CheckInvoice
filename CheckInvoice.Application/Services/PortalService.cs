@@ -30,6 +30,71 @@ public class PortalService : IPortalService
         _currentUserService = currentUserService;
     }
 
+    // Todo lo que el Pastor necesita en Mi Cuenta en una sola respuesta: sus cuentas (las que
+    // debe primero), los productos de cada una con lo pagado y lo que falta, y los depósitos.
+    public async Task<ResponseGetObject> GetMyStatement()
+    {
+        var clientId = await ResolveMyClientId();
+        if (clientId is null)
+        {
+            return NoLinkedClientResponse();
+        }
+
+        var accounts = await _unitOfWork.Repository<AccountReceivable>().Query()
+            .Where(a => a.ClientId == clientId.Value)
+            .ToListAsync();
+
+        var issueIds = accounts.Where(a => a.IssueId.HasValue).Select(a => a.IssueId!.Value).Distinct().ToList();
+        var issueDatesById = await _unitOfWork.Repository<Issue>().Query()
+            .Where(i => issueIds.Contains(i.IssueId))
+            .ToDictionaryAsync(i => i.IssueId, i => i.IssueDate);
+        var linesByIssue = await ReceivableLines.ForIssuesAsync(_unitOfWork, issueIds);
+
+        var accountIds = accounts.Select(a => a.AccountReceivableId).ToList();
+        var paymentsByAccount = (await _unitOfWork.Repository<Payment>().Query()
+                .Where(p => accountIds.Contains(p.AccountReceivableId))
+                .OrderByDescending(p => p.PaymentDate)
+                .ToListAsync())
+            .GroupBy(p => p.AccountReceivableId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var statement = accounts
+            .Select(a => new PortalStatementAccountDto
+            {
+                AccountReceivableId = a.AccountReceivableId,
+                IssueId = a.IssueId,
+                IssueDate = a.IssueId.HasValue && issueDatesById.TryGetValue(a.IssueId.Value, out var issueDate) ? issueDate : null,
+                DueDate = a.DueDate,
+                Status = AccountReceivableStatus.Effective(a.Status, a.DueDate),
+                TotalAmount = a.TotalAmount,
+                PaidAmount = a.TotalAmount - a.OutstandingBalance,
+                OutstandingBalance = a.OutstandingBalance,
+                Lines = a.IssueId.HasValue && linesByIssue.TryGetValue(a.IssueId.Value, out var lines) ? lines : [],
+                Payments = paymentsByAccount.GetValueOrDefault(a.AccountReceivableId, [])
+                    .Select(p => new PortalStatementPaymentDto
+                    {
+                        PaymentId = p.PaymentId,
+                        PaymentDate = p.PaymentDate,
+                        PaymentMethod = p.PaymentMethod,
+                        Amount = p.Amount,
+                        Notes = p.Notes
+                    })
+                    .ToList()
+            })
+            // Las que debe primero (retrasadas, luego por fecha límite más próxima); pagadas al final.
+            .OrderBy(a => a.Status == "paid" ? 2 : a.Status == "late" ? 0 : 1)
+            .ThenBy(a => a.DueDate ?? DateOnly.MaxValue)
+            .ThenByDescending(a => a.IssueId)
+            .ToList();
+
+        return new ResponseGetObject
+        {
+            Data = statement,
+            Messages = [],
+            StatusCode = HttpStatusCode.OK
+        };
+    }
+
     public async Task<ResponseGetObject> GetMyAccountReceivables(PaginationQueryFilter paginationQueryFilter)
     {
         var clientId = await ResolveMyClientId();
@@ -67,7 +132,8 @@ public class PortalService : IPortalService
                     PaymentType = a.PaymentType,
                     PaymentDetail = a.PaymentDetail,
                     DueDate = a.DueDate,
-                    Status = a.Status,
+                    // El pastor también debe ver "Pago retrasado", no solo pendiente/pagado.
+                    Status = AccountReceivableStatus.Effective(a.Status, a.DueDate),
                     CreatedAt = a.CreatedAt,
                     CreatedById = a.CreatedById
                 }),

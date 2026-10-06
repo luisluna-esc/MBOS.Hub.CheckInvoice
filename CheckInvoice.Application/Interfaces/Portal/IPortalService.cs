@@ -6,6 +6,7 @@ namespace CheckInvoice.Application.Interfaces.Portal;
 
 public interface IPortalService
 {
+    Task<ResponseGetObject> GetMyStatement();
     Task<ResponseGetObject> GetMyAccountReceivables(PaginationQueryFilter paginationQueryFilter);
     Task<ResponseGetObject> GetMyInstallments(PaginationQueryFilter paginationQueryFilter);
     Task<ResponseGetObject> GetMyPayments(PaginationQueryFilter paginationQueryFilter);

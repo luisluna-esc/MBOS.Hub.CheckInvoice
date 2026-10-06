@@ -102,7 +102,16 @@ WHERE m.name IN (
   AND r.name = 'M-BOS'
 ON CONFLICT DO NOTHING;
 
--- Todo lo demás: visible para todos los roles activos.
+-- Pastor: Inicio (además de Mi Cuenta, arriba). No entra en la regla general de abajo.
+INSERT INTO menu_role (menu_id, role_id)
+SELECT m.menu_id, r.role_id
+FROM menu m, role r
+WHERE m.route = '/'
+  AND r.name = 'Pastor'
+ON CONFLICT DO NOTHING;
+
+-- Todo lo demás: visible para todos los roles activos, menos Pastor (solo Inicio y Mi Cuenta)
+-- y Caja (solo Cuentas por Cobrar), que tienen sus menús asignados arriba de forma explícita.
 -- Nota: la exclusión es por NOMBRE, no por ruta — un grupo restringido sin ruta propia
 -- (route IS NULL, como "Reportes") pasaría la condición "m.route IS NULL" de un filtro
 -- basado en ruta y quedaría mal otorgado a todos los roles pese a la regla explícita de
@@ -112,6 +121,7 @@ SELECT m.menu_id, r.role_id
 FROM menu m
 CROSS JOIN role r
 WHERE r.is_active
+  AND r.name NOT IN ('Pastor', 'Caja')
   AND m.name NOT IN (
     'Usuarios', 'Roles', 'Permisos',
     'Anulaciones',
