@@ -203,7 +203,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -368,7 +368,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -530,7 +530,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -726,7 +726,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -915,7 +915,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -1092,7 +1092,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -1273,7 +1273,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -1472,7 +1472,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -1703,7 +1703,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -1830,7 +1830,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(4).Column(c =>
                 {
                     c.Item().AlignCenter().Text($"Usuario: {username}").FontSize(6);
-                    c.Item().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy HH:mm}").FontSize(6);
+                    c.Item().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy HH:mm}").FontSize(6);
                 });
             });
         });
@@ -2029,7 +2029,7 @@ public class ReportService : IReportService
                         row.RelativeItem().Text(t =>
                         {
                             t.Span("FECHA: ").Bold();
-                            t.Span(transfer.TransferDate.ToString("dd/MM/yyyy"));
+                            t.Span(BoliviaTime.FromUtc(transfer.TransferDate).ToString("dd/MM/yyyy"));
                         });
                     });
 
@@ -2126,7 +2126,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -2165,7 +2165,7 @@ public class ReportService : IReportService
     private static string EffectiveAccountReceivableStatus(string status, DateOnly? dueDate) => status switch
     {
         "paid" => "paid",
-        "pending" when dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow) => "late",
+        "pending" when dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(BoliviaTime.Today) => "late",
         _ => status
     };
 
@@ -2364,7 +2364,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -2609,7 +2609,7 @@ public class ReportService : IReportService
 
                             foreach (var row in data.Deposits)
                             {
-                                table.Cell().Element(BodyCell).Text(row.PaymentDate.ToString("dd/MM/yyyy"));
+                                table.Cell().Element(BodyCell).Text(BoliviaTime.FromUtc(row.PaymentDate).ToString("dd/MM/yyyy"));
                                 table.Cell().Element(BodyCell).Text(row.IssueId.HasValue ? row.IssueId.Value.ToString().PadLeft(5, '0') : "—");
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.Amount.ToString("N2", ReportCulture));
                                 table.Cell().Element(BodyCell).Text(PaymentMethodLabel(row.PaymentMethod));
@@ -2622,7 +2622,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -2706,6 +2706,20 @@ public class ReportService : IReportService
         var totalOutstanding = pending.Sum(r => r.OutstandingBalance);
         var totalPortfolio = rows.Sum(r => r.TotalAmount);
 
+        // Un producto por fila (el SP los trae juntos en product_names): con 10 o 20 productos
+        // en una sola celda la fila crecía sin control. Los datos de la cuenta se repiten en cada
+        // fila de sus productos; los totales siguen sumando por cuenta, no por fila.
+        var issueIds = rows.Where(r => r.IssueId.HasValue).Select(r => r.IssueId!.Value).Distinct().ToList();
+        var productLinesByIssue = (await (
+                from d in _unitOfWork.Repository<IssueDetail>().Query()
+                join p in _unitOfWork.Repository<Product>().Query() on d.ProductId equals p.ProductId
+                where issueIds.Contains(d.IssueId)
+                orderby d.IssueDetailId
+                select new { d.IssueId, p.Name, d.Quantity })
+            .ToListAsync())
+            .GroupBy(x => x.IssueId)
+            .ToDictionary(g => g.Key, g => g.Select(x => (Name: x.Name, Quantity: (decimal?)x.Quantity)).ToList());
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
@@ -2746,6 +2760,7 @@ public class ReportService : IReportService
                             columns.RelativeColumn(1);
                             columns.RelativeColumn(1);
                             columns.RelativeColumn(2.1f);
+                            columns.RelativeColumn(0.6f);
                             columns.RelativeColumn(0.9f);
                             columns.RelativeColumn(0.9f);
                             columns.RelativeColumn(1);
@@ -2758,7 +2773,8 @@ public class ReportService : IReportService
                             header.Cell().Element(HeaderCell).Text("N° Salida");
                             header.Cell().Element(HeaderCell).Text("Fecha");
                             header.Cell().Element(HeaderCell).Text("Fecha\nLímite");
-                            header.Cell().Element(HeaderCell).Text("Productos");
+                            header.Cell().Element(HeaderCell).Text("Producto");
+                            header.Cell().Element(HeaderCell).AlignRight().Text("Cant.");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Total");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Pagos");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Saldo\nPendiente");
@@ -2767,18 +2783,26 @@ public class ReportService : IReportService
 
                         foreach (var row in rows)
                         {
-                            table.Cell().Element(BodyCell).Text(row.ClientName ?? "—");
-                            table.Cell().Element(BodyCell).Text(row.IssueId.HasValue ? row.IssueId.Value.ToString().PadLeft(5, '0') : "—");
-                            table.Cell().Element(BodyCell).Text(row.IssueDate.HasValue ? row.IssueDate.Value.ToString("dd/MM/yyyy") : "—");
-                            table.Cell().Element(BodyCell).Text(row.DueDate.HasValue ? row.DueDate.Value.ToString("dd/MM/yyyy") : "—");
-                            table.Cell().Element(BodyCell).Text(row.ProductNames ?? "—");
-                            table.Cell().Element(BodyCell).AlignRight().Text(row.TotalAmount.ToString("N2", ReportCulture));
-                            table.Cell().Element(BodyCell).AlignRight().Text(row.PaidAmount.ToString("N2", ReportCulture));
-                            table.Cell().Element(BodyCell).AlignRight().Text(row.OutstandingBalance.ToString("N2", ReportCulture));
-                            table.Cell().Element(BodyCell).AlignCenter().Text(AccountReceivableStatusLabel(row.Status));
+                            var productLines = row.IssueId.HasValue && productLinesByIssue.TryGetValue(row.IssueId.Value, out var lines)
+                                ? lines
+                                : [(Name: row.ProductNames ?? "—", Quantity: (decimal?)null)];
+
+                            foreach (var product in productLines)
+                            {
+                                table.Cell().Element(BodyCell).Text(row.ClientName ?? "—");
+                                table.Cell().Element(BodyCell).Text(row.IssueId.HasValue ? row.IssueId.Value.ToString().PadLeft(5, '0') : "—");
+                                table.Cell().Element(BodyCell).Text(row.IssueDate.HasValue ? row.IssueDate.Value.ToString("dd/MM/yyyy") : "—");
+                                table.Cell().Element(BodyCell).Text(row.DueDate.HasValue ? row.DueDate.Value.ToString("dd/MM/yyyy") : "—");
+                                table.Cell().Element(BodyCell).Text(product.Name);
+                                table.Cell().Element(BodyCell).AlignRight().Text(product.Quantity.HasValue ? product.Quantity.Value.ToString("0.##", ReportCulture) : "—");
+                                table.Cell().Element(BodyCell).AlignRight().Text(row.TotalAmount.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(row.PaidAmount.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(row.OutstandingBalance.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignCenter().Text(AccountReceivableStatusLabel(row.Status));
+                            }
                         }
 
-                        table.Cell().ColumnSpan(5).Element(CategoryTotalCell).AlignRight().Text("Total Cartera").Bold();
+                        table.Cell().ColumnSpan(6).Element(CategoryTotalCell).AlignRight().Text("Total Cartera").Bold();
                         table.Cell().Element(CategoryTotalCell).AlignRight().Text(totalPortfolio.ToString("N2", ReportCulture)).Bold();
                         table.Cell().Element(CategoryTotalCell).Text("");
                         table.Cell().Element(CategoryTotalCell).AlignRight().Text(totalOutstanding.ToString("N2", ReportCulture)).Bold();
@@ -2797,7 +2821,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -3017,7 +3041,7 @@ public class ReportService : IReportService
                             foreach (var payment in payments)
                             {
                                 balance = Math.Max(balance - payment.Amount, 0);
-                                table.Cell().Element(VoucherBodyCell).Text(payment.PaymentDate.ToString("dd/MM/yyyy HH:mm"));
+                                table.Cell().Element(VoucherBodyCell).Text(BoliviaTime.FromUtc(payment.PaymentDate).ToString("dd/MM/yyyy HH:mm"));
                                 table.Cell().Element(VoucherBodyCell).Text(PaymentMethodLabel(payment.PaymentMethod));
                                 table.Cell().Element(VoucherBodyCell).Text(payment.Notes ?? "—");
                                 table.Cell().Element(VoucherBodyCell).AlignRight().Text(payment.Amount.ToString("N2", ReportCulture));
@@ -3037,7 +3061,7 @@ public class ReportService : IReportService
                 page.Footer().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{DateTime.UtcNow:dd/MM/yyyy}").FontSize(8);
+                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
                     row.RelativeItem().AlignRight().Text(x =>
                     {
                         x.Span("Pág. ").FontSize(8);
@@ -3098,7 +3122,7 @@ public class ReportService : IReportService
 
     private async Task<FinancialDashboardSummaryDto> GetSummaryAsync()
     {
-        var now = DateTime.UtcNow;
+        var now = BoliviaTime.Now;
         var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var monthEnd = monthStart.AddMonths(1);
 
@@ -3135,7 +3159,7 @@ public class ReportService : IReportService
 
     private async Task<List<MonthlyTotalDto>> GetIssuesByMonthAsync()
     {
-        var now = DateTime.UtcNow;
+        var now = BoliviaTime.Now;
         var rangeStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-(MonthsBack - 1));
 
         var raw = await (

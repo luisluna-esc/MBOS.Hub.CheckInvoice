@@ -47,11 +47,19 @@ public class StockService : IStockService
             .Take(pageSize)
             .ToListAsync();
 
+        var items = new List<StockDto>();
+        foreach (var stock in stocks)
+        {
+            var dto = ToDto(stock);
+            dto.ReservedQuantity = await PendingReceiptVoidStock.GetReservedQuantityAsync(_unitOfWork, stock.WarehouseId, stock.ProductId);
+            items.Add(dto);
+        }
+
         return new ResponseGetObject
         {
             Data = new PagedResult<StockDto>
             {
-                Items = stocks.Select(ToDto),
+                Items = items,
                 TotalRecords = totalRecords,
                 PageNumber = pageNumber,
                 PageSize = pageSize

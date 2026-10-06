@@ -21,7 +21,11 @@ public class TransferRequestValidator : AbstractValidator<TransferRequestDto>
             .OverridePropertyName("DestinationWarehouseId");
 
         RuleFor(x => x.Details)
-            .NotEmpty().WithMessage("La transferencia debe tener al menos una línea de producto.");
+            .NotEmpty().WithMessage("La transferencia debe tener al menos una línea de producto.")
+            // El mismo producto en dos líneas confunde al revisar el documento y al validar stock:
+            // se corrige la cantidad en la línea existente en vez de agregar otra.
+            .Must(details => details is null || details.Select(d => d.ProductId).Distinct().Count() == details.Count)
+            .WithMessage("No se puede repetir el mismo producto en más de una línea.");
 
         RuleForEach(x => x.Details).ChildRules(detail =>
         {

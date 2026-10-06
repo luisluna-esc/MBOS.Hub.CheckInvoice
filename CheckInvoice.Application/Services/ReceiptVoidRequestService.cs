@@ -300,15 +300,23 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
 
         var insufficientProductNames = new List<string>();
 
-        foreach (var detail in receiptDetails)
+        foreach (var line in receiptDetails.GroupBy(d => d.ProductId))
         {
+            var productId = line.Key;
+            var quantity = line.Sum(d => d.Quantity);
             var stock = await stockRepository.Query()
-                .FirstOrDefaultAsync(s => s.WarehouseId == receipt.WarehouseId && s.ProductId == detail.ProductId);
+                .FirstOrDefaultAsync(s => s.WarehouseId == receipt.WarehouseId && s.ProductId == productId);
 
-            if (stock is null || stock.Quantity < detail.Quantity)
+            // Las unidades que otras entradas con anulación pendiente ya apartaron no cuentan:
+            // si no, dos anulaciones podrían reclamar el mismo stock y solo una podría aprobarse.
+            var reserved = receipt.WarehouseId.HasValue
+                ? await PendingReceiptVoidStock.GetReservedQuantityAsync(_unitOfWork, receipt.WarehouseId.Value, productId, receipt.ReceiptId)
+                : 0;
+
+            if (stock is null || stock.Quantity - reserved < quantity)
             {
-                var product = await productRepository.GetByIdAsync(detail.ProductId);
-                insufficientProductNames.Add(product?.Name ?? $"#{detail.ProductId}");
+                var product = await productRepository.GetByIdAsync(productId);
+                insufficientProductNames.Add(product?.Name ?? $"#{productId}");
             }
         }
 

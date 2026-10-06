@@ -24,7 +24,10 @@ public class ReceiptRequestValidator : AbstractValidator<ReceiptRequestDto>
             .When(x => x.InvoiceTotal.HasValue);
 
         RuleFor(x => x.Details)
-            .NotEmpty().WithMessage("La entrada debe tener al menos una línea de producto.");
+            .NotEmpty().WithMessage("La entrada debe tener al menos una línea de producto.")
+            // Un producto por entrada: si hay dos órdenes de trabajo para el mismo producto, se registran en entradas separadas.
+            .Must(details => details is null || details.Select(d => d.ProductId).Distinct().Count() == details.Count)
+            .WithMessage("No se puede repetir el mismo producto en más de una línea.");
 
         RuleForEach(x => x.Details).ChildRules(detail =>
         {

@@ -14,7 +14,10 @@ public class InventoryCountRequestValidator : AbstractValidator<InventoryCountRe
             .GreaterThanOrEqualTo(x => x.StartDate).WithMessage("La fecha final no puede ser anterior a la fecha inicial.");
 
         RuleFor(x => x.Details)
-            .NotEmpty().WithMessage("El ajuste de inventario debe tener al menos una línea de producto.");
+            .NotEmpty().WithMessage("El ajuste de inventario debe tener al menos una línea de producto.")
+            // Dos conteos del mismo producto se pisarían: el stock quedaría con el último.
+            .Must(details => details is null || details.Select(d => d.ProductId).Distinct().Count() == details.Count)
+            .WithMessage("No se puede repetir el mismo producto en más de una línea.");
 
         RuleForEach(x => x.Details).ChildRules(detail =>
         {

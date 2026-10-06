@@ -215,7 +215,7 @@ public class ReceiptService : IReceiptService
             ReceiptTypeId = receiptRequestDto.ReceiptTypeId,
             InvoiceNumber = receiptRequestDto.InvoiceNumber,
             Description = receiptRequestDto.Description,
-            IssueDate = receiptRequestDto.IssueDate ?? DateTime.UtcNow,
+            IssueDate = receiptRequestDto.IssueDate?.Date ?? BoliviaTime.Today,
             InvoiceTotal = receiptRequestDto.InvoiceTotal,
             CreatedAt = DateTime.UtcNow,
             CreatedById = _currentUserService.AppUserId
@@ -373,7 +373,7 @@ public class ReceiptService : IReceiptService
             WarehouseId = warehouseId,
             ReceiptTypeId = receiptReturnRequestDto.ReceiptTypeId,
             Description = receiptReturnRequestDto.Description,
-            IssueDate = DateTime.UtcNow,
+            IssueDate = BoliviaTime.Today,
             CreatedAt = DateTime.UtcNow,
             CreatedById = _currentUserService.AppUserId,
             RelatedIssueId = issue.IssueId

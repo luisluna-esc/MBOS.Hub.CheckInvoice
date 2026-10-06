@@ -213,7 +213,8 @@ public class TransferService : ITransferService
                 var stock = await _unitOfWork.Repository<Stock>().Query()
                     .FirstOrDefaultAsync(s => s.WarehouseId == sourceWarehouseId && s.ProductId == productId);
 
-                var available = stock?.Quantity ?? 0;
+                var reserved = await PendingReceiptVoidStock.GetReservedQuantityAsync(_unitOfWork, sourceWarehouseId, productId);
+                var available = Math.Max((stock?.Quantity ?? 0) - reserved, 0);
                 var requested = requestedByProduct[productId];
 
                 if (available < requested)
@@ -222,7 +223,9 @@ public class TransferService : ITransferService
                     errors.Add(new Message
                     {
                         Type = MessageType.Error,
-                        Description = $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}."
+                        Description = reserved > 0
+                            ? $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}. Hay {reserved} unidades apartadas por una anulación de entrada pendiente de aprobación."
+                            : $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}."
                     });
                     continue;
                 }

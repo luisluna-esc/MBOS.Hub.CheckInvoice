@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using CheckInvoice.Application.Dtos.Catalogs;
 using CheckInvoice.Application.Interfaces.Catalogs;
@@ -16,6 +17,12 @@ namespace CheckInvoice.Application.Services;
 
 public class WarehousePeriodService : IWarehousePeriodService
 {
+    // La tabla no tiene una restricción única sobre el nombre, así que dos pedidos al mismo tiempo
+    // (la pantalla de Entrada/Salida carga los períodos en paralelo) podían crear el mismo mes
+    // varias veces. Todo lo que crea o renombra un período pasa por este candado. Es estático
+    // porque el servicio es Scoped y el backend corre en una sola instancia.
+    private static readonly SemaphoreSlim PeriodWriteLock = new(1, 1);
+
     private readonly IUnitOfWork _unitOfWork;
     private readonly PaginationOptions _paginationOptions;
     private readonly IValidator<WarehousePeriodDto> _validator;
@@ -37,6 +44,8 @@ public class WarehousePeriodService : IWarehousePeriodService
     {
         var pageSize = paginationQueryFilter.PageSize > 0 ? paginationQueryFilter.PageSize : _paginationOptions.InitialPageSize;
         var pageNumber = paginationQueryFilter.PageNumber > 0 ? paginationQueryFilter.PageNumber : _paginationOptions.InitialPageNumber;
+
+        await EnsureCurrentPeriodsExistAsync();
 
         var query = _unitOfWork.Repository<WarehousePeriod>().Query();
 
@@ -92,8 +101,21 @@ public class WarehousePeriodService : IWarehousePeriodService
             Name = warehousePeriodDto.Name
         };
 
-        await _unitOfWork.Repository<WarehousePeriod>().AddAsync(warehousePeriod);
-        await _unitOfWork.SaveChangesAsync();
+        await PeriodWriteLock.WaitAsync();
+        try
+        {
+            if (await NameExistsAsync(warehousePeriodDto.Name, null))
+            {
+                return DuplicateNameResponse(0, warehousePeriodDto.Name);
+            }
+
+            await _unitOfWork.Repository<WarehousePeriod>().AddAsync(warehousePeriod);
+            await _unitOfWork.SaveChangesAsync();
+        }
+        finally
+        {
+            PeriodWriteLock.Release();
+        }
 
         return new ResponsePost
         {
@@ -131,10 +153,23 @@ public class WarehousePeriodService : IWarehousePeriodService
             };
         }
 
-        warehousePeriod.Name = warehousePeriodDto.Name;
+        await PeriodWriteLock.WaitAsync();
+        try
+        {
+            if (await NameExistsAsync(warehousePeriodDto.Name, id))
+            {
+                return DuplicateNameResponse(id, warehousePeriodDto.Name);
+            }
 
-        repository.Update(warehousePeriod);
-        await _unitOfWork.SaveChangesAsync();
+            warehousePeriod.Name = warehousePeriodDto.Name;
+
+            repository.Update(warehousePeriod);
+            await _unitOfWork.SaveChangesAsync();
+        }
+        finally
+        {
+            PeriodWriteLock.Release();
+        }
 
         return new ResponsePost
         {
@@ -209,6 +244,61 @@ public class WarehousePeriodService : IWarehousePeriodService
             StatusCode = HttpStatusCode.OK
         };
     }
+
+    // Entradas y Salidas solo dejan elegir el período del mes actual o el anterior. Si nadie
+    // creaba a mano el período del mes nuevo, el 1ro del mes el select quedaba solo con el
+    // anterior. Se crean aquí los que falten, antes de listar, para que siempre estén los dos.
+    // El mes se toma en hora de Bolivia, igual que el select del frontend.
+    private async Task EnsureCurrentPeriodsExistAsync()
+    {
+        var now = BoliviaTime.Now;
+        var requiredNames = new[]
+        {
+            new DateTime(now.Year, now.Month, 1).AddMonths(-1).ToString("yyyy-MM", CultureInfo.InvariantCulture),
+            now.ToString("yyyy-MM", CultureInfo.InvariantCulture)
+        };
+
+        var repository = _unitOfWork.Repository<WarehousePeriod>();
+
+        await PeriodWriteLock.WaitAsync();
+        try
+        {
+            // Se consulta recién con el candado tomado: si otro pedido acababa de crear el mes,
+            // aquí ya se ve y no se repite.
+            var existingNames = await repository.Query()
+                .Where(w => requiredNames.Contains(w.Name))
+                .Select(w => w.Name)
+                .ToListAsync();
+
+            var missingNames = requiredNames.Except(existingNames).ToList();
+            if (missingNames.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var name in missingNames)
+            {
+                await repository.AddAsync(new WarehousePeriod { Name = name });
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+        }
+        finally
+        {
+            PeriodWriteLock.Release();
+        }
+    }
+
+    private Task<bool> NameExistsAsync(string name, long? excludeId) =>
+        _unitOfWork.Repository<WarehousePeriod>().Query()
+            .AnyAsync(w => w.Name == name && (excludeId == null || w.WarehousePeriodId != excludeId));
+
+    private static ResponsePost DuplicateNameResponse(long id, string name) => new()
+    {
+        Id = id,
+        Messages = [new Message { Type = MessageType.Error, Description = $"Ya existe un período de almacén con el nombre \"{name}\"." }],
+        StatusCode = HttpStatusCode.BadRequest
+    };
 
     private static WarehousePeriodDto ToDto(WarehousePeriod warehousePeriod) => new()
     {

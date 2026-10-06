@@ -219,7 +219,8 @@ public class IssueService : IIssueService
             var stock = await _unitOfWork.Repository<Stock>().Query()
                 .FirstOrDefaultAsync(s => s.WarehouseId == issueRequestDto.WarehouseId && s.ProductId == productId);
 
-            var available = stock?.Quantity ?? 0;
+            var reserved = await PendingReceiptVoidStock.GetReservedQuantityAsync(_unitOfWork, issueRequestDto.WarehouseId, productId);
+            var available = Math.Max((stock?.Quantity ?? 0) - reserved, 0);
             var requested = requestedByProduct[productId];
 
             if (available < requested)
@@ -228,7 +229,9 @@ public class IssueService : IIssueService
                 errors.Add(new Message
                 {
                     Type = MessageType.Error,
-                    Description = $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}."
+                    Description = reserved > 0
+                        ? $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}. Hay {reserved} unidades apartadas por una anulación de entrada pendiente de aprobación."
+                        : $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}."
                 });
                 continue;
             }
@@ -253,7 +256,7 @@ public class IssueService : IIssueService
             WarehousePeriodId = issueRequestDto.WarehousePeriodId,
             ClientId = issueRequestDto.ClientId,
             Complement = issueRequestDto.Complement,
-            IssueDate = issueRequestDto.IssueDate ?? DateTime.UtcNow,
+            IssueDate = issueRequestDto.IssueDate?.Date ?? BoliviaTime.Today,
             PrintTypeId = issueRequestDto.PrintTypeId,
             Description = issueRequestDto.Description,
             CreatedAt = DateTime.UtcNow,
