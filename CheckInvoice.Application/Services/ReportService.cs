@@ -213,7 +213,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, "Inventario General").GeneratePdf();
     }
 
     // Plantilla en blanco para contar físicamente en papel, antes de que exista
@@ -378,7 +378,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, "Plantilla de Conteo Físico").GeneratePdf();
     }
 
     private const string GetStockByDepartmentReportSql = """
@@ -540,7 +540,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, "Inventario por Departamento").GeneratePdf();
     }
 
     private const string GetKardexReportSql = """
@@ -736,7 +736,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, "Kardex Físico Valorado").GeneratePdf();
     }
 
     private const string GetInventoryCountReportSql = """
@@ -925,7 +925,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, "Levantamiento de Inventario").GeneratePdf();
     }
 
     private const string GetIssuesReportSql = """
@@ -1102,7 +1102,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, "Salidas de Almacén").GeneratePdf();
     }
 
     private const string GetReceiptsReportSql = """
@@ -1283,7 +1283,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, "Ingresos de Almacén").GeneratePdf();
     }
 
     private const string GetReceiptVoucherLinesSql = """
@@ -1482,7 +1482,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, $"Ingreso a Almacén N° {receiptId.ToString().PadLeft(5, '0')}").GeneratePdf();
     }
 
     private const string GetIssueVoucherLinesSql = """
@@ -1580,7 +1580,7 @@ public partial class ReportService : IReportService
             ? BuildIssueVoucherRollDocument(issueId, printTypeName, issue, lines, total, warehouseName, clientName, username)
             : BuildIssueVoucherFullPageDocument(issueId, printTypeName, issueTypeName, issue, lines, total, warehouseName, clientName, inventoryManagerName, username);
 
-        return document.GeneratePdf();
+        return WithTitle(document, $"Salida de Almacén N° {issueId.ToString().PadLeft(5, '0')}").GeneratePdf();
     }
 
     private static Document BuildIssueVoucherFullPageDocument(
@@ -2136,7 +2136,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, $"Transferencia N° {transferId.ToString().PadLeft(5, '0')}").GeneratePdf();
     }
 
     // Grid completo (no solo borde inferior como HeaderCell/BodyCell) para que el comprobante
@@ -2370,7 +2370,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, "Kardex por Material").GeneratePdf();
     }
 
     private const string GetPastorFieldReceivablesSql = """
@@ -2634,7 +2634,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, "Reporte Campo Pastor").GeneratePdf();
     }
 
     private const string GetAccountReceivablesReportSql = """
@@ -2943,7 +2943,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, "Cartera de Cuentas por Cobrar").GeneratePdf();
     }
 
     // Comprobante de una sola Cuenta por Cobrar (a diferencia del reporte general de arriba,
@@ -3183,7 +3183,7 @@ public partial class ReportService : IReportService
             });
         });
 
-        return document.GeneratePdf();
+        return WithTitle(document, $"Cuenta por Cobrar N° {accountReceivableId.ToString().PadLeft(5, '0')}").GeneratePdf();
     }
 
     private static byte[] GetLogoBytes()
@@ -3211,6 +3211,11 @@ public partial class ReportService : IReportService
 
     private static IContainer BodyCell(IContainer container) =>
         container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(3);
+
+    // Título del PDF: lo muestran el visor del navegador y la pestaña en lugar del nombre interno
+    // del archivo temporal (un código como "97402a5b-178a-..."), que no le dice nada al usuario.
+    private static Document WithTitle(Document document, string title) =>
+        document.WithMetadata(new DocumentMetadata { Title = title, Author = "InvenTrack" });
 
     private static IContainer SubtotalCell(IContainer container) =>
         container.Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten2).Padding(3);
