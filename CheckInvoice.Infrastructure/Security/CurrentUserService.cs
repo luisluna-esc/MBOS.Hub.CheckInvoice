@@ -24,4 +24,7 @@ public class CurrentUserService : ICurrentUserService
 
     public bool HasPermission(string code) =>
         _httpContextAccessor.HttpContext?.User?.HasClaim("permission", code) ?? false;
+
+    public bool IsInRole(string role) =>
+        _httpContextAccessor.HttpContext?.User?.IsInRole(role) ?? false;
 }

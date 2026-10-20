@@ -11,4 +11,8 @@ public class Supplier
     public string? Phone { get; set; }
     public string? Notes { get; set; }
     public bool IsActive { get; set; } = true;
+    // Proveedor adventista: su distrito e iglesia (sin esto es null). Es dato del proveedor,
+    // aunque no esté registrado también como cliente.
+    public long? DistrictId { get; set; }
+    public long? ChurchId { get; set; }
 }

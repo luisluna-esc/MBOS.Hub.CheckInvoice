@@ -26,6 +26,15 @@ public class IssuesController : ControllerBase
         return StatusCode((int)result.StatusCode, result);
     }
 
+    // La abre el QR impreso en el comprobante de la salida (con sesión iniciada) y la corrección.
+    [Authorize(Policy = "issue.view")]
+    [HttpGet("{id}/summary")]
+    public async Task<IActionResult> GetSummary(long id)
+    {
+        var result = await _issueService.GetIssueSummary(id);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
     [Authorize(Policy = "issue.view")]
     [HttpGet("{id}/details")]
     public async Task<IActionResult> GetDetails(long id)

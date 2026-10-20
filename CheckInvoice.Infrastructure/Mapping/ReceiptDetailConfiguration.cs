@@ -28,6 +28,10 @@ public class ReceiptDetailConfiguration : IEntityTypeConfiguration<ReceiptDetail
               .HasColumnName("quantity")
               .HasColumnType("numeric(12,2)");
 
+        entity.Property(e => e.UnitPrice)
+              .HasColumnName("unit_price")
+              .HasColumnType("numeric(12,2)");
+
         entity.Property(e => e.UnitCost)
               .IsRequired()
               .HasColumnName("unit_cost")

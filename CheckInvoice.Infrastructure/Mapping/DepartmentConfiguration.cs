@@ -20,6 +20,10 @@ public class DepartmentConfiguration : IEntityTypeConfiguration<Department>
               .HasMaxLength(100)
               .HasColumnName("name");
 
+        entity.Property(e => e.Code)
+              .HasMaxLength(20)
+              .HasColumnName("code");
+
         entity.Property(e => e.IsActive)
               .HasColumnName("is_active");
     }

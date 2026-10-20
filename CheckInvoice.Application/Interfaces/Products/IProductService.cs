@@ -11,4 +11,7 @@ public interface IProductService
     Task<ResponsePost> InsertProduct(ProductDto productDto);
     Task<ResponsePost> UpdateProduct(long id, ProductDto productDto);
     Task<ResponsePost> DeleteProduct(long id);
+    Task<(byte[] Content, string ContentType)?> GetProductImage(long id);
+    Task<ResponsePost> SetProductImage(long id, byte[] content, string contentType);
+    Task<ResponsePost> DeleteProductImage(long id);
 }

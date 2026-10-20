@@ -99,11 +99,22 @@ public class TransferService : ITransferService
             .Take(pageSize)
             .ToListAsync();
 
+        var pageIds = transfers.Select(t => t.TransferId).ToList();
+        var pendingVoids = await _unitOfWork.Repository<TransferVoidRequest>().Query()
+            .Where(v => v.Status == "pending" && pageIds.Contains(v.TransferId))
+            .Select(v => v.TransferId)
+            .ToListAsync();
+
         return new ResponseGetObject
         {
             Data = new PagedResult<TransferDto>
             {
-                Items = transfers.Select(ToDto),
+                Items = transfers.Select(t =>
+                {
+                    var dto = ToDto(t);
+                    dto.HasPendingVoidRequest = pendingVoids.Contains(t.TransferId);
+                    return dto;
+                }),
                 TotalRecords = totalRecords,
                 PageNumber = pageNumber,
                 PageSize = pageSize
@@ -224,7 +235,7 @@ public class TransferService : ITransferService
                     {
                         Type = MessageType.Error,
                         Description = reserved > 0
-                            ? $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}. Hay {reserved} unidades apartadas por una anulación de entrada pendiente de aprobación."
+                            ? $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}. Hay {reserved} unidades apartadas por una anulación o corrección de entrada pendiente de aprobación."
                             : $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}."
                     });
                     continue;
@@ -263,6 +274,7 @@ public class TransferService : ITransferService
 
         await _unitOfWork.Repository<Transfer>().AddAsync(transfer);
         await _unitOfWork.SaveChangesAsync();
+        await DocumentReviews.RecordEnteredAsync(_unitOfWork, DocumentReviews.Transfer, transfer.TransferId, _currentUserService.AppUserId);
 
         var stockRepository = _unitOfWork.Repository<Stock>();
         var destinationStockCache = new Dictionary<long, Stock>();
@@ -271,14 +283,18 @@ public class TransferService : ITransferService
         {
             var sourceStock = sourceStockByProduct.GetValueOrDefault(line.ProductId);
             var movedCost = sourceStock?.AverageCost ?? line.UnitPrice ?? 0;
+            // Redondeado como se imprime, para que cantidad x costo cuadre en el comprobante.
+            var unitCost = Math.Round(movedCost, 2, MidpointRounding.AwayFromZero);
 
+            // Transferencia interna: se guarda el costo unitario con el que sale del origen (no un
+            // precio de venta). Las columnas conservan su nombre histórico unit_price/total_sale_price.
             await _unitOfWork.Repository<TransferDetail>().AddAsync(new TransferDetail
             {
                 TransferId = transfer.TransferId,
                 ProductId = line.ProductId,
                 Quantity = line.Quantity,
-                UnitPrice = line.UnitPrice,
-                TotalSalePrice = line.UnitPrice.HasValue ? line.Quantity * line.UnitPrice.Value : null
+                UnitPrice = unitCost,
+                TotalSalePrice = line.Quantity * unitCost
             });
 
             if (sourceStock is not null)
@@ -396,6 +412,8 @@ public class TransferService : ITransferService
         Notes = transfer.Notes,
         IsApproved = transfer.IsApproved,
         ApprovedById = transfer.ApprovedById,
-        ApprovedAt = transfer.ApprovedAt
+        ApprovedAt = transfer.ApprovedAt,
+        ReviewStatus = transfer.ReviewStatus,
+        IsVoided = transfer.IsVoided
     };
 }

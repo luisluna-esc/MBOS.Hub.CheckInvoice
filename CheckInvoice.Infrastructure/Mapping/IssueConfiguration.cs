@@ -55,5 +55,18 @@ public class IssueConfiguration : IEntityTypeConfiguration<Issue>
               .IsRequired()
               .HasColumnName("is_voided")
               .HasDefaultValue(false);
+        entity.Property(e => e.ReviewStatus)
+              .IsRequired()
+              .HasMaxLength(20)
+              .HasColumnName("review_status")
+              .HasDefaultValue("digitado");
+
+        entity.Property(e => e.MonthlyNumber)
+              .HasColumnName("monthly_number");
+
+        entity.Property(e => e.ReviewVersion)
+              .IsRequired()
+              .HasColumnName("review_version")
+              .HasDefaultValue(1);
     }
 }

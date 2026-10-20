@@ -46,5 +46,11 @@ public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
               .HasColumnName("is_active");
 
         entity.HasIndex(e => e.PartyId).IsUnique();
+
+        entity.Property(e => e.DistrictId)
+              .HasColumnName("district_id");
+
+        entity.Property(e => e.ChurchId)
+              .HasColumnName("church_id");
     }
 }

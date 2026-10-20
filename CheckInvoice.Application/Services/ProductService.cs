@@ -58,7 +58,10 @@ public class ProductService : IProductService
 
         if (!string.IsNullOrWhiteSpace(paginationQueryFilter.SearchCriteria))
         {
-            query = query.Where(p => p.Name.Contains(paginationQueryFilter.SearchCriteria));
+            // Sin distinguir mayúsculas y también por código: al cargar productos con el teclado se
+            // escribe "p" o "900" y deben aparecer "Papel Bond" o el código 90001.
+            var term = paginationQueryFilter.SearchCriteria.Trim().ToLower();
+            query = query.Where(p => p.Name.ToLower().Contains(term) || (p.Code != null && p.Code.ToLower().Contains(term)));
         }
 
         if (productQueryFilter.IsActive.HasValue)
@@ -82,11 +85,27 @@ public class ProductService : IProductService
             .Take(pageSize)
             .ToListAsync();
 
+        // Solo la fecha de la foto (no el contenido) para saber cuáles tienen.
+        var productIds = products.Select(p => p.ProductId).ToList();
+        var imageVersions = await _unitOfWork.Repository<ProductImage>().Query()
+            .Where(i => productIds.Contains(i.ProductId))
+            .Select(i => new { i.ProductId, i.UpdatedAt })
+            .ToDictionaryAsync(i => i.ProductId, i => i.UpdatedAt.Ticks);
+
         return new ResponseGetObject
         {
             Data = new PagedResult<ProductDto>
             {
-                Items = products.Select(ToDto),
+                Items = products.Select(p =>
+                {
+                    var dto = ToDto(p);
+                    if (imageVersions.TryGetValue(p.ProductId, out var version))
+                    {
+                        dto.HasImage = true;
+                        dto.ImageVersion = version;
+                    }
+                    return dto;
+                }),
                 TotalRecords = totalRecords,
                 PageNumber = pageNumber,
                 PageSize = pageSize
@@ -269,6 +288,81 @@ public class ProductService : IProductService
             errors.Add(new Message { Type = MessageType.Error, Description = "La unidad de medida seleccionada no existe." });
         }
     }
+
+    public const int MaxImageBytes = 5 * 1024 * 1024;
+    private static readonly string[] AllowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    public async Task<(byte[] Content, string ContentType)?> GetProductImage(long id)
+    {
+        var image = await _unitOfWork.Repository<ProductImage>().Query().FirstOrDefaultAsync(i => i.ProductId == id);
+        return image is null ? null : (image.Content, image.ContentType);
+    }
+
+    public async Task<ResponsePost> SetProductImage(long id, byte[] content, string contentType)
+    {
+        if (!await _unitOfWork.Repository<Product>().Query().AnyAsync(p => p.ProductId == id))
+        {
+            return ImageError(id, "No se encontró el producto.", HttpStatusCode.NotFound);
+        }
+
+        if (!AllowedImageTypes.Contains(contentType))
+        {
+            return ImageError(id, "La foto debe ser JPG, PNG o WEBP.", HttpStatusCode.BadRequest);
+        }
+
+        if (content.Length == 0 || content.Length > MaxImageBytes)
+        {
+            return ImageError(id, "La foto no puede pesar más de 5 MB.", HttpStatusCode.BadRequest);
+        }
+
+        var repository = _unitOfWork.Repository<ProductImage>();
+        var image = await repository.Query().FirstOrDefaultAsync(i => i.ProductId == id);
+        if (image is null)
+        {
+            await repository.AddAsync(new ProductImage { ProductId = id, Content = content, ContentType = contentType, UpdatedAt = DateTime.UtcNow });
+        }
+        else
+        {
+            image.Content = content;
+            image.ContentType = contentType;
+            image.UpdatedAt = DateTime.UtcNow;
+            repository.Update(image);
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+
+        return new ResponsePost
+        {
+            Id = id,
+            Messages = [new Message { Type = MessageType.Success, Description = "Foto guardada correctamente." }],
+            StatusCode = HttpStatusCode.OK
+        };
+    }
+
+    public async Task<ResponsePost> DeleteProductImage(long id)
+    {
+        var repository = _unitOfWork.Repository<ProductImage>();
+        var image = await repository.Query().FirstOrDefaultAsync(i => i.ProductId == id);
+        if (image is not null)
+        {
+            repository.Remove(image);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        return new ResponsePost
+        {
+            Id = id,
+            Messages = [new Message { Type = MessageType.Success, Description = "Foto quitada correctamente." }],
+            StatusCode = HttpStatusCode.OK
+        };
+    }
+
+    private static ResponsePost ImageError(long id, string message, HttpStatusCode statusCode) => new()
+    {
+        Id = id,
+        Messages = [new Message { Type = MessageType.Error, Description = message }],
+        StatusCode = statusCode
+    };
 
     private static ProductDto ToDto(Product product) => new()
     {

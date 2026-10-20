@@ -17,11 +17,8 @@ namespace CheckInvoice.Application.Services;
 
 public class WarehousePeriodService : IWarehousePeriodService
 {
-    // La tabla no tiene una restricción única sobre el nombre, así que dos pedidos al mismo tiempo
-    // (la pantalla de Entrada/Salida carga los períodos en paralelo) podían crear el mismo mes
-    // varias veces. Todo lo que crea o renombra un período pasa por este candado. Es estático
-    // porque el servicio es Scoped y el backend corre en una sola instancia.
-    private static readonly SemaphoreSlim PeriodWriteLock = new(1, 1);
+    // Mismo candado que usan las Entradas al crear el período de su fecha (ver MovementDates).
+    private static SemaphoreSlim PeriodWriteLock => MovementDates.PeriodWriteLock;
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly PaginationOptions _paginationOptions;

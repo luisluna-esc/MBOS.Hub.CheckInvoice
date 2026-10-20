@@ -44,6 +44,13 @@ public class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
               .HasColumnName("issue_date")
               .HasColumnType("timestamp without time zone");
 
+        entity.Property(e => e.PurchaseDate)
+              .HasColumnName("purchase_date")
+              .HasColumnType("timestamp without time zone");
+
+        entity.Property(e => e.MonthlyNumber)
+              .HasColumnName("monthly_number");
+
         entity.Property(e => e.InvoiceTotal)
               .HasColumnName("invoice_total")
               .HasColumnType("numeric(12,2)");
@@ -63,5 +70,15 @@ public class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
 
         entity.Property(e => e.RelatedIssueId)
               .HasColumnName("related_issue_id");
+        entity.Property(e => e.ReviewStatus)
+              .IsRequired()
+              .HasMaxLength(20)
+              .HasColumnName("review_status")
+              .HasDefaultValue("digitado");
+
+        entity.Property(e => e.ReviewVersion)
+              .IsRequired()
+              .HasColumnName("review_version")
+              .HasDefaultValue(1);
     }
 }

@@ -11,21 +11,22 @@ public class ReceiptRequestValidator : AbstractValidator<ReceiptRequestDto>
             .GreaterThan(0).WithMessage("Debes seleccionar un almacén.");
 
         RuleFor(x => x.TaxId)
-            .MaximumLength(20).WithMessage("El NIT no puede superar los 20 caracteres.");
+            .MaximumLength(20).WithMessage("El NIT o CI no puede superar los 20 caracteres.");
 
         RuleFor(x => x.InvoiceNumber)
-            .MaximumLength(50).WithMessage("El número de factura no puede superar los 50 caracteres.");
+            .MaximumLength(50).WithMessage("El número de factura o documento no puede superar los 50 caracteres.");
 
         RuleFor(x => x.Description)
             .MaximumLength(255).WithMessage("La descripción no puede superar los 255 caracteres.");
 
+        // Obligatorio solo en compras: lo revisa ReceiptService, que conoce el tipo de entrada.
         RuleFor(x => x.InvoiceTotal)
-            .GreaterThanOrEqualTo(0).WithMessage("El total de la factura no puede ser negativo.")
+            .GreaterThan(0).WithMessage("El valor total de la compra debe ser mayor a cero.")
             .When(x => x.InvoiceTotal.HasValue);
 
         RuleFor(x => x.Details)
             .NotEmpty().WithMessage("La entrada debe tener al menos una línea de producto.")
-            // Un producto por entrada: si hay dos órdenes de trabajo para el mismo producto, se registran en entradas separadas.
+            // Un producto por entrada.
             .Must(details => details is null || details.Select(d => d.ProductId).Distinct().Count() == details.Count)
             .WithMessage("No se puede repetir el mismo producto en más de una línea.");
 
@@ -37,14 +38,8 @@ public class ReceiptRequestValidator : AbstractValidator<ReceiptRequestDto>
             detail.RuleFor(d => d.Quantity)
                 .GreaterThan(0).WithMessage("La cantidad debe ser mayor a cero.");
 
-            detail.RuleFor(d => d.UnitCost)
-                .GreaterThanOrEqualTo(0).WithMessage("El costo unitario no puede ser negativo.");
-
-            detail.RuleFor(d => d.WorkOrder)
-                .MaximumLength(50).WithMessage("La orden de trabajo no puede superar los 50 caracteres.");
-
-            detail.RuleFor(d => d.Detail)
-                .MaximumLength(255).WithMessage("El detalle no puede superar los 255 caracteres.");
+            detail.RuleFor(d => d.UnitPrice)
+                .GreaterThanOrEqualTo(0).WithMessage("El precio unitario no puede ser negativo.");
         });
     }
 }

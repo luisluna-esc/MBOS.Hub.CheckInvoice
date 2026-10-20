@@ -22,12 +22,23 @@ public interface IReportService
     Task<List<IssuesReportRowDto>> GetIssuesReport(IssuesReportQueryFilter filter);
     Task<byte[]> GenerateIssuesReportPdf(IssuesReportQueryFilter filter);
     Task<byte[]> GenerateIssuesReportExcel(IssuesReportQueryFilter filter);
-    Task<byte[]?> GenerateIssueVoucherPdf(long issueId, long? printTypeId = null);
+    Task<byte[]?> GenerateIssueVoucherPdf(long issueId, long? printTypeId = null, string? publicBaseUrl = null);
     Task<byte[]?> GenerateTransferVoucherPdf(long transferId);
     Task<List<ReceiptsReportRowDto>> GetReceiptsReport(ReceiptsReportQueryFilter filter);
     Task<byte[]> GenerateReceiptsReportPdf(ReceiptsReportQueryFilter filter);
     Task<byte[]> GenerateReceiptsReportExcel(ReceiptsReportQueryFilter filter);
-    Task<byte[]?> GenerateReceiptVoucherPdf(long receiptId);
+    Task<List<TransfersReportRowDto>> GetTransfersReport(TransfersReportQueryFilter filter);
+    Task<byte[]> GenerateTransfersReportPdf(TransfersReportQueryFilter filter);
+    Task<byte[]> GenerateTransfersReportExcel(TransfersReportQueryFilter filter);
+    Task<List<AccountingEntryRowDto>> GetIssuesAccountingReport(AccountingReportQueryFilter filter);
+    Task<byte[]> GenerateIssuesAccountingExcel(AccountingReportQueryFilter filter);
+    Task<List<AccountingEntryRowDto>> GetReceiptsAccountingReport(AccountingReportQueryFilter filter);
+    Task<byte[]> GenerateReceiptsAccountingExcel(AccountingReportQueryFilter filter);
+    /// <summary>TXT (separado por tabulaciones) con el mismo contenido que la versión Excel del reporte.</summary>
+    Task<byte[]> ToTxt(Func<Task<byte[]>> excelReport);
+    Task<byte[]> GenerateIssuesAccountingTxt(AccountingReportQueryFilter filter);
+    Task<byte[]> GenerateReceiptsAccountingTxt(AccountingReportQueryFilter filter);
+    Task<byte[]?> GenerateReceiptVoucherPdf(long receiptId, string? publicBaseUrl = null);
     Task<List<KardexByProductReportRowDto>> GetKardexByProductReport(KardexByProductReportQueryFilter filter);
     Task<byte[]> GenerateKardexByProductReportPdf(KardexByProductReportQueryFilter filter);
     Task<byte[]> GenerateKardexByProductReportExcel(KardexByProductReportQueryFilter filter);

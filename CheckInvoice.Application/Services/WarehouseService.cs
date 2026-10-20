@@ -3,6 +3,7 @@ using CheckInvoice.Application.Dtos.Catalogs;
 using CheckInvoice.Application.Interfaces.Catalogs;
 using CheckInvoice.core.Configuration;
 using CheckInvoice.core.Entities.Catalogs;
+using CheckInvoice.core.Entities.Warehouses;
 using CheckInvoice.core.Entities.ResponseApi.Details;
 using CheckInvoice.core.Entities.ResponseApi.DisplayFormat;
 using CheckInvoice.core.Interfaces;
@@ -129,6 +130,23 @@ public class WarehouseService : IWarehouseService
                 Messages = [new Message { Type = MessageType.Error, Description = "No se encontró el almacén." }],
                 StatusCode = HttpStatusCode.NotFound
             };
+        }
+
+        // Desactivar un almacén con productos los dejaría fuera de Entradas y Salidas: primero se
+        // transfieren a otro almacén (o se ajustan).
+        if (warehouse.IsActive && !warehouseDto.IsActive)
+        {
+            var withStock = await _unitOfWork.Repository<Stock>().Query()
+                .CountAsync(s => s.WarehouseId == id && s.Quantity != 0);
+            if (withStock > 0)
+            {
+                return new ResponsePost
+                {
+                    Id = id,
+                    Messages = [new Message { Type = MessageType.Error, Description = $"No se puede desactivar: el almacén todavía tiene {withStock} producto(s) con stock. Transfiérelos a otro almacén o ajústalos primero." }],
+                    StatusCode = HttpStatusCode.BadRequest
+                };
+            }
         }
 
         warehouse.Name = warehouseDto.Name;

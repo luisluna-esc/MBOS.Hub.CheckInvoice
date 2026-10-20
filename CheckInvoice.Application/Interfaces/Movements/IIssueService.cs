@@ -9,5 +9,6 @@ public interface IIssueService
 {
     Task<ResponseGetObject> GetAllIssues(PaginationQueryFilter paginationQueryFilter, IssueQueryFilter issueQueryFilter);
     Task<ResponseGetObject> GetIssueDetails(long issueId);
+    Task<ResponseGetObject> GetIssueSummary(long issueId);
     Task<ResponsePost> InsertIssue(IssueRequestDto issueRequestDto);
 }

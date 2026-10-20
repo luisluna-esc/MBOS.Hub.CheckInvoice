@@ -76,6 +76,8 @@ CREATE TABLE media_type (
 CREATE TABLE department (
     department_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
+    -- Código contable (SubAccountCode del informe para contabilidad).
+    code VARCHAR(20),
     is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
@@ -341,8 +343,12 @@ CREATE TABLE supplier (
     phone VARCHAR(20),
     notes VARCHAR(255),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    district_id BIGINT, -- Proveedor adventista: distrito
+    church_id BIGINT, -- Proveedor adventista: iglesia
     CONSTRAINT fk_supplier_party FOREIGN KEY (party_id) REFERENCES party(party_id),
     CONSTRAINT fk_supplier_country FOREIGN KEY (country_id) REFERENCES country(country_id),
+    CONSTRAINT fk_supplier_district FOREIGN KEY (district_id) REFERENCES district(district_id),
+    CONSTRAINT fk_supplier_church FOREIGN KEY (church_id) REFERENCES church(church_id),
     CONSTRAINT uq_supplier_party UNIQUE (party_id)
 );
 
@@ -354,9 +360,22 @@ CREATE TABLE product (
     sub_department_id BIGINT,
     media_type_id BIGINT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    -- Códigos contables fijos del informe para contabilidad (no se muestran en pantalla).
+    fund_code VARCHAR(10) NOT NULL DEFAULT '10',
+    function_code VARCHAR(10) NOT NULL DEFAULT '0000',
+    restriction_code VARCHAR(10) NOT NULL DEFAULT '0A',
     CONSTRAINT fk_product_department FOREIGN KEY (department_id) REFERENCES department(department_id),
     CONSTRAINT fk_product_sub_department FOREIGN KEY (sub_department_id) REFERENCES sub_department(sub_department_id),
     CONSTRAINT fk_product_media_type FOREIGN KEY (media_type_id) REFERENCES media_type(media_type_id)
+);
+
+-- Una foto por producto (la sube el formulario de Producto; máximo 5 MB).
+CREATE TABLE product_image (
+    product_id BIGINT PRIMARY KEY,
+    content BYTEA NOT NULL,
+    content_type VARCHAR(50) NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_product_image_product FOREIGN KEY (product_id) REFERENCES product(product_id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_product_department ON product(department_id);
@@ -389,11 +408,15 @@ CREATE TABLE receipt (
     receipt_type_id BIGINT,
     invoice_number VARCHAR(50),
     description VARCHAR(255),
-    issue_date TIMESTAMP NOT NULL DEFAULT NOW(),
+    issue_date TIMESTAMP NOT NULL DEFAULT NOW(), -- Fecha de ingreso al almacén
+    purchase_date TIMESTAMP, -- Fecha de compra (factura o recibo), solo en compras
+    monthly_number INT, -- N° de nota dentro del mes de issue_date ("15-01")
     invoice_total NUMERIC(12,2),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     created_by BIGINT,
     is_voided BOOLEAN NOT NULL DEFAULT FALSE,
+    review_status VARCHAR(20) NOT NULL DEFAULT 'digitado', -- digitado / verificado / aprobado
+    review_version INT NOT NULL DEFAULT 1,
     related_issue_id BIGINT, -- Devolución: Entrada que referencia la Salida de origen. FK agregada más abajo, después de CREATE TABLE issue (issue aún no existe en este punto del script).
     CONSTRAINT fk_receipt_supplier FOREIGN KEY (supplier_id) REFERENCES supplier(supplier_id),
     CONSTRAINT fk_receipt_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouse(warehouse_id),
@@ -401,8 +424,11 @@ CREATE TABLE receipt (
     CONSTRAINT fk_receipt_receipt_type FOREIGN KEY (receipt_type_id) REFERENCES receipt_type(receipt_type_id),
     CONSTRAINT fk_receipt_created_by FOREIGN KEY (created_by) REFERENCES app_user(app_user_id)
 );
+CREATE UNIQUE INDEX uq_issue_monthly_number ON issue (date_trunc('month', issue_date), monthly_number);
+
 
 CREATE INDEX idx_receipt_warehouse ON receipt(warehouse_id);
+CREATE UNIQUE INDEX uq_receipt_monthly_number ON receipt (date_trunc('month', issue_date), monthly_number);
 CREATE INDEX idx_receipt_issue_date ON receipt(issue_date);
 CREATE INDEX idx_receipt_supplier ON receipt(supplier_id);
 
@@ -414,11 +440,14 @@ CREATE TABLE issue (
     client_id BIGINT,
     complement VARCHAR(10),
     issue_date TIMESTAMP NOT NULL DEFAULT NOW(),
+    monthly_number INT, -- N° de salida dentro del mes de issue_date ("S 15-01-26")
     print_type_id BIGINT,
     description VARCHAR(255),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     created_by BIGINT,
     is_voided BOOLEAN NOT NULL DEFAULT FALSE,
+    review_status VARCHAR(20) NOT NULL DEFAULT 'digitado', -- digitado / verificado / aprobado
+    review_version INT NOT NULL DEFAULT 1,
     CONSTRAINT fk_issue_issue_type FOREIGN KEY (issue_type_id) REFERENCES issue_type(issue_type_id),
     CONSTRAINT fk_issue_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouse(warehouse_id),
     CONSTRAINT fk_issue_warehouse_period FOREIGN KEY (warehouse_period_id) REFERENCES warehouse_period(warehouse_period_id),
@@ -447,6 +476,9 @@ CREATE TABLE transfer (
     is_approved BOOLEAN NOT NULL DEFAULT TRUE,
     approved_by_id BIGINT,
     approved_at TIMESTAMP,
+    is_voided BOOLEAN NOT NULL DEFAULT FALSE, -- anulada con autorización del Contador
+    review_status VARCHAR(20) NOT NULL DEFAULT 'digitado', -- digitado / verificado / aprobado
+    review_version INT NOT NULL DEFAULT 1,
     CONSTRAINT fk_transfer_source_warehouse FOREIGN KEY (source_warehouse_id) REFERENCES warehouse(warehouse_id),
     CONSTRAINT fk_transfer_destination_warehouse FOREIGN KEY (destination_warehouse_id) REFERENCES warehouse(warehouse_id),
     CONSTRAINT fk_transfer_sender_user FOREIGN KEY (sender_user_id) REFERENCES app_user(app_user_id),
@@ -514,6 +546,7 @@ CREATE TABLE receipt_detail (
     receipt_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
     quantity NUMERIC(12,2) NOT NULL,
+    unit_price NUMERIC(12,2), -- Precio de compra; con retención unit_cost = unit_price x 0,92
     unit_cost NUMERIC(12,2) NOT NULL,
     total_cost NUMERIC(12,2) NOT NULL,
     work_order VARCHAR(50),
@@ -642,6 +675,33 @@ CREATE INDEX idx_payment_account_receivable ON payment(account_receivable_id);
 -- immutable movement headers: receipt, issue, transfer)
 -- =====================================================================
 
+-- Historial de revisión y firma digital de Entradas, Salidas y Transferencias: quién digitó,
+-- verificó, aprobó, rechazó o reabrió (con motivo) cada versión del documento.
+CREATE TABLE document_review (
+    document_review_id BIGSERIAL PRIMARY KEY,
+    document_type VARCHAR(20) NOT NULL,
+    document_id BIGINT NOT NULL,
+    version INT NOT NULL DEFAULT 1,
+    action VARCHAR(20) NOT NULL,
+    user_id BIGINT,
+    at TIMESTAMP NOT NULL DEFAULT NOW(),
+    reason VARCHAR(255),
+    content_hash VARCHAR(64), -- huella del contenido firmado
+    CONSTRAINT fk_document_review_user FOREIGN KEY (user_id) REFERENCES app_user(app_user_id),
+    CONSTRAINT ck_document_review_type CHECK (document_type IN ('receipt', 'issue', 'transfer')),
+    CONSTRAINT ck_document_review_action CHECK (action IN ('digitado', 'verificado', 'aprobado', 'rechazado', 'reabierto', 'corregido'))
+);
+CREATE INDEX idx_document_review_document ON document_review(document_type, document_id);
+
+-- Buzón: notificaciones que cada usuario ya vio.
+CREATE TABLE inbox_seen (
+    user_id BIGINT NOT NULL,
+    notification_key VARCHAR(60) NOT NULL,
+    seen_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT pk_inbox_seen PRIMARY KEY (user_id, notification_key),
+    CONSTRAINT fk_inbox_seen_user FOREIGN KEY (user_id) REFERENCES app_user(app_user_id) ON DELETE CASCADE
+);
+
 CREATE TABLE change_request (
     change_request_id BIGSERIAL PRIMARY KEY,
     table_name VARCHAR(50) NOT NULL,
@@ -658,7 +718,7 @@ CREATE TABLE change_request (
     review_notes VARCHAR(255),
     CONSTRAINT fk_change_request_requested_by FOREIGN KEY (requested_by) REFERENCES app_user(app_user_id),
     CONSTRAINT fk_change_request_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES app_user(app_user_id),
-    CONSTRAINT chk_change_request_table CHECK (table_name IN ('receipt', 'issue', 'transfer')),
+    CONSTRAINT chk_change_request_table CHECK (table_name IN ('receipt', 'issue', 'transfer', 'receipt_edit')), -- receipt_edit: corrección de entrada con productos
     CONSTRAINT chk_change_request_action CHECK (action IN ('edit', 'delete'))
 );
 
@@ -691,6 +751,25 @@ CREATE TABLE issue_void_request (
 
 CREATE INDEX idx_issue_void_request_issue ON issue_void_request(issue_id);
 CREATE UNIQUE INDEX uq_issue_void_request_pending ON issue_void_request(issue_id) WHERE status = 'pending';
+
+-- Anulación de Transferencias (la aprueba el Contador; los productos vuelven al origen).
+CREATE TABLE transfer_void_request (
+    transfer_void_request_id BIGSERIAL PRIMARY KEY,
+    transfer_id BIGINT NOT NULL,
+    void_reason_id BIGINT NOT NULL,
+    detail VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    requested_by BIGINT NOT NULL,
+    requested_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    reviewed_by BIGINT,
+    reviewed_at TIMESTAMP,
+    review_notes VARCHAR(255),
+    CONSTRAINT fk_transfer_void_request_transfer FOREIGN KEY (transfer_id) REFERENCES transfer(transfer_id),
+    CONSTRAINT fk_transfer_void_request_reason FOREIGN KEY (void_reason_id) REFERENCES void_reason(void_reason_id),
+    CONSTRAINT fk_transfer_void_request_requested_by FOREIGN KEY (requested_by) REFERENCES app_user(app_user_id),
+    CONSTRAINT fk_transfer_void_request_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES app_user(app_user_id),
+    CONSTRAINT chk_transfer_void_request_status CHECK (status IN ('pending', 'approved', 'rejected'))
+);
 
 CREATE TABLE receipt_void_request (
     receipt_void_request_id BIGSERIAL PRIMARY KEY,

@@ -44,7 +44,7 @@ ON CONFLICT DO NOTHING;
 -- apartado de Devoluciones/Ajuste de Inventario, nunca se eligen a mano.
 INSERT INTO receipt_type (name, is_active) VALUES
 ('Compras con Factura', TRUE), ('Compras con Retencion', TRUE), ('Inventario Inicial', TRUE),
-('Devolucion', TRUE), ('Ajuste', TRUE)
+('Devolucion', TRUE), ('Ajuste', TRUE), ('Donacion', TRUE)
 ON CONFLICT DO NOTHING;
 
 -- "Impresion Rollo" usa el formato de rollo térmico angosto (ver ReportService.isRoll);
@@ -57,12 +57,10 @@ INSERT INTO media_type (name, is_active) VALUES
 ('Libro', TRUE), ('Revista', TRUE), ('Folleto', TRUE), ('DVD', TRUE), ('Multimedia', TRUE)
 ON CONFLICT DO NOTHING;
 
--- ALMACEN CENTRAL MBOS es el único almacén operativo (donde se registran Entradas, Salidas
--- y Ajustes); los otros cuatro (uno por cada Misión) solo existen como origen/destino de
--- Transferencias, por eso los selects de creación de documentos solo deben ofrecer MBOS.
+-- Solo almacenes propios (el sistema ya no es entre misiones). Se agregan más (Almacén 2, 3...)
+-- desde Configuración del Sistema > Almacenes.
 INSERT INTO warehouse (name, is_active) VALUES
-('ALMACEN CENTRAL MBON', TRUE), ('ALMACEN CENTRAL UB', TRUE), ('ALMACEN CENTRAL MOB', TRUE),
-('ALMACEN CENTRAL MBC', TRUE), ('ALMACEN CENTRAL MBOS', TRUE)
+('ALMACEN CENTRAL MBOS', TRUE)
 ON CONFLICT DO NOTHING;
 
 -- Casos especiales de facturación (códigos del SIN que reemplazan al NIT real del cliente).

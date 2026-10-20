@@ -48,6 +48,8 @@ public class SupplierService : ISupplierService
             is_active AS "IsActive",
             linked_client_id AS "LinkedClientId",
             linked_client_name AS "LinkedClientName",
+            NULL::bigint AS "DistrictId",
+            NULL::bigint AS "ChurchId",
             total_records AS "TotalRecords"
         FROM sp_get_suppliers(
             {0}::bigint, {1}::varchar, {2}::varchar, {3}::bigint, {4}::varchar, {5}::boolean, {6}::int, {7}::int
@@ -74,6 +76,21 @@ public class SupplierService : ISupplierService
             pageSize);
 
         var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
+
+        // Distrito e iglesia (proveedor adventista) no vienen en el procedimiento: se completan aquí.
+        var pageIds = rows.Select(r => r.SupplierId).ToList();
+        var churches = await _unitOfWork.Repository<Supplier>().Query()
+            .Where(s => pageIds.Contains(s.SupplierId))
+            .Select(s => new { s.SupplierId, s.DistrictId, s.ChurchId })
+            .ToDictionaryAsync(s => s.SupplierId);
+        foreach (var row in rows)
+        {
+            if (churches.TryGetValue(row.SupplierId, out var church))
+            {
+                row.DistrictId = church.DistrictId;
+                row.ChurchId = church.ChurchId;
+            }
+        }
 
         return new ResponseGetObject
         {
@@ -148,7 +165,9 @@ public class SupplierService : ISupplierService
             Address = supplierDto.Address,
             Phone = supplierDto.Phone,
             Notes = supplierDto.Notes,
-            IsActive = supplierDto.IsActive
+            IsActive = supplierDto.IsActive,
+            DistrictId = supplierDto.DistrictId,
+            ChurchId = supplierDto.DistrictId.HasValue ? supplierDto.ChurchId : null
         };
 
         var repository = _unitOfWork.Repository<Supplier>();
@@ -225,6 +244,8 @@ public class SupplierService : ISupplierService
         supplier.Phone = supplierDto.Phone;
         supplier.Notes = supplierDto.Notes;
         supplier.IsActive = supplierDto.IsActive;
+        supplier.DistrictId = supplierDto.DistrictId;
+        supplier.ChurchId = supplierDto.DistrictId.HasValue ? supplierDto.ChurchId : null;
 
         repository.Update(supplier);
         await _unitOfWork.SaveChangesAsync();

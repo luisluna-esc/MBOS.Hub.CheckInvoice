@@ -35,6 +35,8 @@ BEGIN
         RAISE EXCEPTION 'Hay % movimiento(s) registrados a mano sobre datos de la demo. Revísalos antes de borrar.', v_extra;
     END IF;
 
+    DELETE FROM document_review WHERE (document_type = 'issue' AND document_id = ANY (v_issues))
+                               OR (document_type = 'receipt' AND document_id = ANY (v_receipts));
     DELETE FROM issue_void_request WHERE issue_id = ANY (v_issues);
     DELETE FROM receipt_void_request WHERE receipt_id = ANY (v_receipts);
     DELETE FROM payment WHERE payment_id = ANY (v_payments);            -- payment_detail se borra en cascada

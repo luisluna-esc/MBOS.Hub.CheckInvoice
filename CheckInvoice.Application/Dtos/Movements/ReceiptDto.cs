@@ -21,4 +21,8 @@ public class ReceiptDto
     public string? VoidReasonName { get; set; }
     public string? VoidDetail { get; set; }
     public long? RelatedIssueId { get; set; }
+    // N° de nota por mes ("15-01"). Lo completa ReceiptService después de leer la página.
+    public string? NoteNumber { get; set; }
+    // Revisión: digitado, verificado o aprobado.
+    public string? ReviewStatus { get; set; }
 }

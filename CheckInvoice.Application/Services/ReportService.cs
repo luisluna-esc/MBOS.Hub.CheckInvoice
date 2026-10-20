@@ -22,6 +22,10 @@ public partial class ReportService : IReportService
 {
     private const int MonthsBack = 6;
     private static readonly CultureInfo ReportCulture = new("es-ES");
+
+    /// <summary>Cantidades: son unidades enteras, así que van sin decimales (si alguna tuviera fracción, se muestra).</summary>
+    private static string Qty(decimal quantity) => quantity.ToString("#,##0.##", ReportCulture);
+
     private static byte[]? _logoBytes;
 
     private readonly IUnitOfWork _unitOfWork;
@@ -121,26 +125,9 @@ public partial class ReportService : IReportService
             {
                 page.Size(PageSizes.Letter);
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(9));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(9));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(11);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(11);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(11);
-                        });
-                        row.ConstantItem(140).Height(45).Image(GetLogoBytes()).FitArea();
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("INVENTARIO GENERAL").Bold().FontSize(14);
-                    column.Item().AlignCenter().Text($"Almacén: {warehouseName}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Periodo: {periodText}").FontSize(10);
-                    column.Item().AlignCenter().Text("(Expresado en Bolivianos)").FontSize(9).Italic();
-                });
+                page.Header().Element(c => ReportHeader(c, "Inventario General", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -160,20 +147,20 @@ public partial class ReportService : IReportService
                         header.Cell().Element(HeaderCell).Text("Descripción");
                         header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nTotal");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
                     });
 
                     foreach (var dept in groups)
                     {
-                        table.Cell().ColumnSpan(6).Element(c => c.PaddingTop(8).PaddingBottom(2))
+                        table.Cell().ColumnSpan(6).Element(GroupTitleCell)
                             .Text(dept.Department).Bold().FontSize(10);
 
                         var deptTotal = 0m;
 
                         foreach (var sub in dept.SubGroups)
                         {
-                            table.Cell().ColumnSpan(6).Element(c => c.PaddingBottom(2))
+                            table.Cell().ColumnSpan(6).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
 
                             var subTotal = 0m;
@@ -183,7 +170,7 @@ public partial class ReportService : IReportService
                                 table.Cell().Element(BodyCell).Text(row.Code ?? "");
                                 table.Cell().Element(BodyCell).Text(row.Name);
                                 table.Cell().Element(BodyCell).Text(row.UnitMeasure ?? "");
-                                table.Cell().Element(BodyCell).AlignRight().Text(row.NetQuantity.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.NetQuantity));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.UnitValue.ToString("N2", ReportCulture));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.TotalValue.ToString("N2", ReportCulture));
                                 subTotal += row.TotalValue;
@@ -200,16 +187,7 @@ public partial class ReportService : IReportService
                     }
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
@@ -267,26 +245,9 @@ public partial class ReportService : IReportService
             {
                 page.Size(PageSizes.Letter);
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(7));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(7));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(11);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(11);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(11);
-                        });
-                        row.ConstantItem(140).Height(45).Image(GetLogoBytes()).FitArea();
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("PLANTILLA DE CONTEO FÍSICO").Bold().FontSize(14);
-                    column.Item().AlignCenter().Text($"Almacén: {warehouseName}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Periodo: {periodText}").FontSize(10);
-                    column.Item().AlignCenter().Text("(Expresado en Bolivianos)").FontSize(9).Italic();
-                });
+                page.Header().Element(c => ReportHeader(c, "Plantilla de Conteo Físico", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -308,15 +269,15 @@ public partial class ReportService : IReportService
                         header.Cell().Element(HeaderCell).Text("Descripción");
                         header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nTotal");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad\nFísica");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Diferencia");
                     });
 
                     foreach (var dept in groups)
                     {
-                        table.Cell().ColumnSpan(8).Element(c => c.PaddingTop(8).PaddingBottom(2))
+                        table.Cell().ColumnSpan(8).Element(GroupTitleCell)
                             .Text(dept.Department).Bold().FontSize(10);
 
                         var deptQty = 0m;
@@ -324,7 +285,7 @@ public partial class ReportService : IReportService
 
                         foreach (var sub in dept.SubGroups)
                         {
-                            table.Cell().ColumnSpan(8).Element(c => c.PaddingBottom(2))
+                            table.Cell().ColumnSpan(8).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
 
                             var subQty = 0m;
@@ -335,7 +296,7 @@ public partial class ReportService : IReportService
                                 table.Cell().Element(BodyCell).Text(row.Code ?? "");
                                 table.Cell().Element(BodyCell).Text(row.Name);
                                 table.Cell().Element(BodyCell).Text(row.UnitMeasure ?? "");
-                                table.Cell().Element(BodyCell).AlignRight().Text(row.NetQuantity.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.NetQuantity));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.UnitValue.ToString("N2", ReportCulture));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.TotalValue.ToString("N2", ReportCulture));
                                 table.Cell().Element(BodyCell).Text("");
@@ -346,7 +307,7 @@ public partial class ReportService : IReportService
                             }
 
                             table.Cell().ColumnSpan(3).Element(SubtotalCell).AlignRight().Text("Total sub Categoría").Bold();
-                            table.Cell().Element(SubtotalCell).AlignRight().Text(subQty.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(SubtotalCell).AlignRight().Text(Qty(subQty)).Bold();
                             table.Cell().Element(SubtotalCell).Text("");
                             table.Cell().Element(SubtotalCell).AlignRight().Text(subTotalValue.ToString("N2", ReportCulture)).Bold();
                             table.Cell().Element(SubtotalCell).Text("");
@@ -357,7 +318,7 @@ public partial class ReportService : IReportService
                         }
 
                         table.Cell().ColumnSpan(3).Element(CategoryTotalCell).AlignRight().Text("Total Categoría").Bold();
-                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(deptQty.ToString("N2", ReportCulture)).Bold();
+                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(deptQty)).Bold();
                         table.Cell().Element(CategoryTotalCell).Text("");
                         table.Cell().Element(CategoryTotalCell).AlignRight().Text(deptTotalValue.ToString("N2", ReportCulture)).Bold();
                         table.Cell().Element(CategoryTotalCell).Text("");
@@ -365,16 +326,7 @@ public partial class ReportService : IReportService
                     }
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
@@ -453,27 +405,9 @@ public partial class ReportService : IReportService
             {
                 page.Size(PageSizes.Letter);
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(9));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(9));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(11);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(11);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(11);
-                        });
-                        row.ConstantItem(140).Height(45).Image(GetLogoBytes()).FitArea();
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("INVENTARIO POR DEPARTAMENTO").Bold().FontSize(14);
-                    column.Item().AlignCenter().Text($"Almacén: {warehouseName}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Categoría: {departmentName}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Periodo: {periodText}").FontSize(10);
-                    column.Item().AlignCenter().Text("(Expresado en Bolivianos)").FontSize(9).Italic();
-                });
+                page.Header().Element(c => ReportHeader(c, "Inventario por Departamento", $"Almacén: {warehouseName}", $"Categoría: {departmentName}", $"Periodo: {periodText}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -493,15 +427,15 @@ public partial class ReportService : IReportService
                         header.Cell().Element(HeaderCell).Text("Descripción");
                         header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nTotal");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
                     });
 
                     var grandTotal = 0m;
 
                     foreach (var sub in groups)
                     {
-                        table.Cell().ColumnSpan(6).Element(c => c.PaddingTop(8).PaddingBottom(2))
+                        table.Cell().ColumnSpan(6).Element(GroupTitleCell)
                             .Text(sub.Key).Bold().FontSize(10);
 
                         var subTotal = 0m;
@@ -511,7 +445,7 @@ public partial class ReportService : IReportService
                             table.Cell().Element(BodyCell).Text(row.Code ?? "");
                             table.Cell().Element(BodyCell).Text(row.Name);
                             table.Cell().Element(BodyCell).Text(row.UnitMeasure ?? "");
-                            table.Cell().Element(BodyCell).AlignRight().Text(row.NetQuantity.ToString("N2", ReportCulture));
+                            table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.NetQuantity));
                             table.Cell().Element(BodyCell).AlignRight().Text(row.UnitValue.ToString("N2", ReportCulture));
                             table.Cell().Element(BodyCell).AlignRight().Text(row.TotalValue.ToString("N2", ReportCulture));
                             subTotal += row.TotalValue;
@@ -527,16 +461,7 @@ public partial class ReportService : IReportService
                     table.Cell().Element(CategoryTotalCell).AlignRight().Text(grandTotal.ToString("N2", ReportCulture)).Bold();
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
@@ -609,26 +534,9 @@ public partial class ReportService : IReportService
             {
                 page.Size(PageSizes.Letter.Landscape());
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(8));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(8));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(11);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(11);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(11);
-                        });
-                        row.ConstantItem(140).Height(45).Image(GetLogoBytes()).FitArea();
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("KARDEX FÍSICO VALORADO").Bold().FontSize(14);
-                    column.Item().AlignCenter().Text($"Almacén: {warehouseName}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Periodo: {periodText}").FontSize(10);
-                    column.Item().AlignCenter().Text("(Expresado en Bolivianos)").FontSize(9).Italic();
-                });
+                page.Header().Element(c => ReportHeader(c, "Kardex Físico Valorado", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -651,13 +559,13 @@ public partial class ReportService : IReportService
                         header.Cell().Element(HeaderCell).Text("Código");
                         header.Cell().Element(HeaderCell).Text("Descripción");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Saldo Inicial\nCant.");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Saldo Inicial\nValor");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Saldo Inicial\nCosto");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Entradas\nCant.");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Entradas\nValor");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Entradas\nCosto");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Salidas\nCant.");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Salidas\nValor");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Salidas\nCosto");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Saldos\nCant.");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Saldos\nValor");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Saldos\nCosto");
                     });
 
                     decimal grandReceiptsQty = 0m, grandReceiptsValue = 0m;
@@ -666,7 +574,7 @@ public partial class ReportService : IReportService
 
                     foreach (var sub in groups)
                     {
-                        table.Cell().ColumnSpan(10).Element(c => c.PaddingTop(8).PaddingBottom(2))
+                        table.Cell().ColumnSpan(10).Element(GroupTitleCell)
                             .Text(sub.Key).Bold().FontSize(10);
 
                         decimal subReceiptsQty = 0m, subReceiptsValue = 0m;
@@ -677,13 +585,13 @@ public partial class ReportService : IReportService
                         {
                             table.Cell().Element(BodyCell).Text(row.Code ?? "");
                             table.Cell().Element(BodyCell).Text(row.Name);
-                            table.Cell().Element(BodyCell).AlignRight().Text(row.OpeningQuantity.ToString("N2", ReportCulture));
+                            table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.OpeningQuantity));
                             table.Cell().Element(BodyCell).AlignRight().Text(row.OpeningValue.ToString("N2", ReportCulture));
-                            table.Cell().Element(BodyCell).AlignRight().Text(row.ReceiptsQuantity.ToString("N2", ReportCulture));
+                            table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.ReceiptsQuantity));
                             table.Cell().Element(BodyCell).AlignRight().Text(row.ReceiptsValue.ToString("N2", ReportCulture));
-                            table.Cell().Element(BodyCell).AlignRight().Text(row.IssuesQuantity.ToString("N2", ReportCulture));
+                            table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.IssuesQuantity));
                             table.Cell().Element(BodyCell).AlignRight().Text(row.IssuesValue.ToString("N2", ReportCulture));
-                            table.Cell().Element(BodyCell).AlignRight().Text(row.ClosingQuantity.ToString("N2", ReportCulture));
+                            table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.ClosingQuantity));
                             table.Cell().Element(BodyCell).AlignRight().Text(row.ClosingValue.ToString("N2", ReportCulture));
 
                             subReceiptsQty += row.ReceiptsQuantity;
@@ -697,11 +605,11 @@ public partial class ReportService : IReportService
                         table.Cell().ColumnSpan(2).Element(SubtotalCell).AlignRight().Text("Total sub Categoría").Bold();
                         table.Cell().Element(SubtotalCell).Text("");
                         table.Cell().Element(SubtotalCell).Text("");
-                        table.Cell().Element(SubtotalCell).AlignRight().Text(subReceiptsQty.ToString("N2", ReportCulture)).Bold();
+                        table.Cell().Element(SubtotalCell).AlignRight().Text(Qty(subReceiptsQty)).Bold();
                         table.Cell().Element(SubtotalCell).AlignRight().Text(subReceiptsValue.ToString("N2", ReportCulture)).Bold();
-                        table.Cell().Element(SubtotalCell).AlignRight().Text(subIssuesQty.ToString("N2", ReportCulture)).Bold();
+                        table.Cell().Element(SubtotalCell).AlignRight().Text(Qty(subIssuesQty)).Bold();
                         table.Cell().Element(SubtotalCell).AlignRight().Text(subIssuesValue.ToString("N2", ReportCulture)).Bold();
-                        table.Cell().Element(SubtotalCell).AlignRight().Text(subClosingQty.ToString("N2", ReportCulture)).Bold();
+                        table.Cell().Element(SubtotalCell).AlignRight().Text(Qty(subClosingQty)).Bold();
                         table.Cell().Element(SubtotalCell).AlignRight().Text(subClosingValue.ToString("N2", ReportCulture)).Bold();
 
                         grandReceiptsQty += subReceiptsQty;
@@ -715,24 +623,15 @@ public partial class ReportService : IReportService
                     table.Cell().ColumnSpan(2).Element(CategoryTotalCell).AlignRight().Text("Total General").Bold();
                     table.Cell().Element(CategoryTotalCell).Text("");
                     table.Cell().Element(CategoryTotalCell).Text("");
-                    table.Cell().Element(CategoryTotalCell).AlignRight().Text(grandReceiptsQty.ToString("N2", ReportCulture)).Bold();
+                    table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(grandReceiptsQty)).Bold();
                     table.Cell().Element(CategoryTotalCell).AlignRight().Text(grandReceiptsValue.ToString("N2", ReportCulture)).Bold();
-                    table.Cell().Element(CategoryTotalCell).AlignRight().Text(grandIssuesQty.ToString("N2", ReportCulture)).Bold();
+                    table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(grandIssuesQty)).Bold();
                     table.Cell().Element(CategoryTotalCell).AlignRight().Text(grandIssuesValue.ToString("N2", ReportCulture)).Bold();
-                    table.Cell().Element(CategoryTotalCell).AlignRight().Text(grandClosingQty.ToString("N2", ReportCulture)).Bold();
+                    table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(grandClosingQty)).Bold();
                     table.Cell().Element(CategoryTotalCell).AlignRight().Text(grandClosingValue.ToString("N2", ReportCulture)).Bold();
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
@@ -812,26 +711,9 @@ public partial class ReportService : IReportService
             {
                 page.Size(PageSizes.Letter);
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(7));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(7));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(11);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(11);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(11);
-                        });
-                        row.ConstantItem(140).Height(45).Image(GetLogoBytes()).FitArea();
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("LEVANTAMIENTO DE INVENTARIO").Bold().FontSize(14);
-                    column.Item().AlignCenter().Text($"Almacén: {warehouseName}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Periodo: {periodText}").FontSize(10);
-                    column.Item().AlignCenter().Text("(Expresado en Bolivianos)").FontSize(9).Italic();
-                });
+                page.Header().Element(c => ReportHeader(c, "Levantamiento de Inventario", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -853,22 +735,22 @@ public partial class ReportService : IReportService
                         header.Cell().Element(HeaderCell).Text("Descripción");
                         header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nTotal");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad\nFísica");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Diferencia");
                     });
 
                     foreach (var dept in groups)
                     {
-                        table.Cell().ColumnSpan(8).Element(c => c.PaddingTop(8).PaddingBottom(2))
+                        table.Cell().ColumnSpan(8).Element(GroupTitleCell)
                             .Text(dept.Department).Bold().FontSize(10);
 
                         decimal deptQty = 0m, deptTotalValue = 0m, deptPhysicalQty = 0m, deptDifference = 0m;
 
                         foreach (var sub in dept.SubGroups)
                         {
-                            table.Cell().ColumnSpan(8).Element(c => c.PaddingBottom(2))
+                            table.Cell().ColumnSpan(8).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
 
                             decimal subQty = 0m, subTotalValue = 0m, subPhysicalQty = 0m, subDifference = 0m;
@@ -878,11 +760,11 @@ public partial class ReportService : IReportService
                                 table.Cell().Element(BodyCell).Text(row.Code ?? "");
                                 table.Cell().Element(BodyCell).Text(row.Name);
                                 table.Cell().Element(BodyCell).Text(row.UnitMeasure ?? "");
-                                table.Cell().Element(BodyCell).AlignRight().Text(row.Quantity.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.Quantity));
                                 table.Cell().Element(BodyCell).AlignRight().Text((row.UnitValue ?? 0).ToString("N2", ReportCulture));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.TotalValue.ToString("N2", ReportCulture));
-                                table.Cell().Element(BodyCell).AlignRight().Text((row.PhysicalQuantity ?? 0).ToString("N2", ReportCulture));
-                                table.Cell().Element(BodyCell).AlignRight().Text((row.Difference ?? 0).ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(Qty((row.PhysicalQuantity ?? 0)));
+                                table.Cell().Element(BodyCell).AlignRight().Text(Qty((row.Difference ?? 0)));
 
                                 subQty += row.Quantity;
                                 subTotalValue += row.TotalValue;
@@ -891,11 +773,11 @@ public partial class ReportService : IReportService
                             }
 
                             table.Cell().ColumnSpan(3).Element(SubtotalCell).AlignRight().Text("Total sub Categoría").Bold();
-                            table.Cell().Element(SubtotalCell).AlignRight().Text(subQty.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(SubtotalCell).AlignRight().Text(Qty(subQty)).Bold();
                             table.Cell().Element(SubtotalCell).Text("");
                             table.Cell().Element(SubtotalCell).AlignRight().Text(subTotalValue.ToString("N2", ReportCulture)).Bold();
-                            table.Cell().Element(SubtotalCell).AlignRight().Text(subPhysicalQty.ToString("N2", ReportCulture)).Bold();
-                            table.Cell().Element(SubtotalCell).AlignRight().Text(subDifference.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(SubtotalCell).AlignRight().Text(Qty(subPhysicalQty)).Bold();
+                            table.Cell().Element(SubtotalCell).AlignRight().Text(Qty(subDifference)).Bold();
 
                             deptQty += subQty;
                             deptTotalValue += subTotalValue;
@@ -904,24 +786,15 @@ public partial class ReportService : IReportService
                         }
 
                         table.Cell().ColumnSpan(3).Element(CategoryTotalCell).AlignRight().Text("Total Categoría").Bold();
-                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(deptQty.ToString("N2", ReportCulture)).Bold();
+                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(deptQty)).Bold();
                         table.Cell().Element(CategoryTotalCell).Text("");
                         table.Cell().Element(CategoryTotalCell).AlignRight().Text(deptTotalValue.ToString("N2", ReportCulture)).Bold();
-                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(deptPhysicalQty.ToString("N2", ReportCulture)).Bold();
-                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(deptDifference.ToString("N2", ReportCulture)).Bold();
+                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(deptPhysicalQty)).Bold();
+                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(deptDifference)).Bold();
                     }
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
@@ -947,6 +820,7 @@ public partial class ReportService : IReportService
 
     public async Task<List<IssuesReportRowDto>> GetIssuesReport(IssuesReportQueryFilter filter)
     {
+        await LoadIssueNumbersAsync();
         return await _unitOfWork.SqlQueryAsync<IssuesReportRowDto>(
             GetIssuesReportSql,
             (object?)filter.WarehouseId ?? DBNull.Value,
@@ -1000,26 +874,9 @@ public partial class ReportService : IReportService
             {
                 page.Size(PageSizes.Letter);
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(7));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(7));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(11);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(11);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(11);
-                        });
-                        row.ConstantItem(140).Height(45).Image(GetLogoBytes()).FitArea();
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("SALIDAS DE ALMACÉN").Bold().FontSize(14);
-                    column.Item().AlignCenter().Text($"Almacén: {warehouseName}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Periodo: {periodText}").FontSize(10);
-                    column.Item().AlignCenter().Text("(Expresado en Bolivianos)").FontSize(9).Italic();
-                });
+                page.Header().Element(c => ReportHeader(c, "Salidas de Almacén", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -1041,31 +898,31 @@ public partial class ReportService : IReportService
                         header.Cell().Element(HeaderCell).Text("Descripción");
                         header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nTotal");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
                     });
 
                     foreach (var dept in groups)
                     {
-                        table.Cell().ColumnSpan(7).Element(c => c.PaddingTop(8).PaddingBottom(2))
+                        table.Cell().ColumnSpan(7).Element(GroupTitleCell)
                             .Text(dept.Department).Bold().FontSize(10);
 
                         decimal deptQty = 0m, deptTotalValue = 0m;
 
                         foreach (var sub in dept.SubGroups)
                         {
-                            table.Cell().ColumnSpan(7).Element(c => c.PaddingBottom(2))
+                            table.Cell().ColumnSpan(7).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
 
                             decimal subQty = 0m, subTotalValue = 0m;
 
                             foreach (var row in sub.OrderBy(r => r.Name).ThenBy(r => r.IssueId))
                             {
-                                table.Cell().Element(BodyCell).Text(row.IssueId.ToString().PadLeft(5, '0'));
+                                table.Cell().Element(BodyCell).Text(IssueNo(row.IssueId));
                                 table.Cell().Element(BodyCell).Text(row.Code ?? "");
                                 table.Cell().Element(BodyCell).Text(row.Name);
                                 table.Cell().Element(BodyCell).Text(row.UnitMeasure ?? "");
-                                table.Cell().Element(BodyCell).AlignRight().Text(row.Quantity.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.Quantity));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.UnitCost.ToString("N2", ReportCulture));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.TotalCost.ToString("N2", ReportCulture));
 
@@ -1074,7 +931,7 @@ public partial class ReportService : IReportService
                             }
 
                             table.Cell().ColumnSpan(4).Element(SubtotalCell).AlignRight().Text("Total sub Categoría").Bold();
-                            table.Cell().Element(SubtotalCell).AlignRight().Text(subQty.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(SubtotalCell).AlignRight().Text(Qty(subQty)).Bold();
                             table.Cell().Element(SubtotalCell).Text("");
                             table.Cell().Element(SubtotalCell).AlignRight().Text(subTotalValue.ToString("N2", ReportCulture)).Bold();
 
@@ -1083,22 +940,13 @@ public partial class ReportService : IReportService
                         }
 
                         table.Cell().ColumnSpan(4).Element(CategoryTotalCell).AlignRight().Text("Total Categoría").Bold();
-                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(deptQty.ToString("N2", ReportCulture)).Bold();
+                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(deptQty)).Bold();
                         table.Cell().Element(CategoryTotalCell).Text("");
                         table.Cell().Element(CategoryTotalCell).AlignRight().Text(deptTotalValue.ToString("N2", ReportCulture)).Bold();
                     }
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
@@ -1137,6 +985,7 @@ public partial class ReportService : IReportService
         QuestPDF.Settings.License = LicenseType.Community;
 
         var rows = await GetReceiptsReport(filter);
+        var noteNumbers = await ReceiptNoteNumbersAsync(rows.Select(r => r.ReceiptId));
 
         var warehouseName = "Todos los almacenes";
         if (filter.WarehouseId.HasValue)
@@ -1178,32 +1027,15 @@ public partial class ReportService : IReportService
             {
                 page.Size(PageSizes.Letter);
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(7));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(7));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(11);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(11);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(11);
-                        });
-                        row.ConstantItem(140).Height(45).Image(GetLogoBytes()).FitArea();
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("INGRESOS DE ALMACÉN").Bold().FontSize(14);
-                    column.Item().AlignCenter().Text($"Almacén: {warehouseName}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Periodo: {periodText}").FontSize(10);
-                    column.Item().AlignCenter().Text("(Expresado en Bolivianos)").FontSize(9).Italic();
-                });
+                page.Header().Element(c => ReportHeader(c, "Ingresos de Almacén", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
                     table.ColumnsDefinition(columns =>
                     {
-                        columns.ConstantColumn(38);
+                        columns.ConstantColumn(58);
                         columns.ConstantColumn(45);
                         columns.ConstantColumn(30);
                         columns.RelativeColumn(1);
@@ -1215,38 +1047,38 @@ public partial class ReportService : IReportService
 
                     table.Header(header =>
                     {
-                        header.Cell().Element(HeaderCell).Text("N° Ingreso");
+                        header.Cell().Element(HeaderCell).Text("N° Nota");
                         header.Cell().Element(HeaderCell).Text("Fecha");
                         header.Cell().Element(HeaderCell).Text("Código");
                         header.Cell().Element(HeaderCell).Text("Descripción");
                         header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nTotal");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
                     });
 
                     foreach (var dept in groups)
                     {
-                        table.Cell().ColumnSpan(8).Element(c => c.PaddingTop(8).PaddingBottom(2))
+                        table.Cell().ColumnSpan(8).Element(GroupTitleCell)
                             .Text(dept.Department).Bold().FontSize(10);
 
                         decimal deptQty = 0m, deptTotalValue = 0m;
 
                         foreach (var sub in dept.SubGroups)
                         {
-                            table.Cell().ColumnSpan(8).Element(c => c.PaddingBottom(2))
+                            table.Cell().ColumnSpan(8).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
 
                             decimal subQty = 0m, subTotalValue = 0m;
 
                             foreach (var row in sub.OrderBy(r => r.Name).ThenBy(r => r.ReceiptId))
                             {
-                                table.Cell().Element(BodyCell).Text(row.ReceiptId.ToString().PadLeft(5, '0'));
+                                table.Cell().Element(BodyCell).Text(noteNumbers.GetValueOrDefault(row.ReceiptId, row.ReceiptId.ToString()));
                                 table.Cell().Element(BodyCell).Text(row.ReceiptDate.ToString("dd/MM/yyyy"));
                                 table.Cell().Element(BodyCell).Text(row.Code ?? "");
                                 table.Cell().Element(BodyCell).Text(row.Name);
                                 table.Cell().Element(BodyCell).Text(row.UnitMeasure ?? "");
-                                table.Cell().Element(BodyCell).AlignRight().Text(row.Quantity.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.Quantity));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.UnitCost.ToString("N2", ReportCulture));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.TotalCost.ToString("N2", ReportCulture));
 
@@ -1255,7 +1087,7 @@ public partial class ReportService : IReportService
                             }
 
                             table.Cell().ColumnSpan(5).Element(SubtotalCell).AlignRight().Text("Total sub Categoría").Bold();
-                            table.Cell().Element(SubtotalCell).AlignRight().Text(subQty.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(SubtotalCell).AlignRight().Text(Qty(subQty)).Bold();
                             table.Cell().Element(SubtotalCell).Text("");
                             table.Cell().Element(SubtotalCell).AlignRight().Text(subTotalValue.ToString("N2", ReportCulture)).Bold();
 
@@ -1264,225 +1096,17 @@ public partial class ReportService : IReportService
                         }
 
                         table.Cell().ColumnSpan(5).Element(CategoryTotalCell).AlignRight().Text("Total Categoría").Bold();
-                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(deptQty.ToString("N2", ReportCulture)).Bold();
+                        table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(deptQty)).Bold();
                         table.Cell().Element(CategoryTotalCell).Text("");
                         table.Cell().Element(CategoryTotalCell).AlignRight().Text(deptTotalValue.ToString("N2", ReportCulture)).Bold();
                     }
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
         return WithTitle(document, "Ingresos de Almacén").GeneratePdf();
-    }
-
-    private const string GetReceiptVoucherLinesSql = """
-        SELECT
-            code AS "Code",
-            name AS "Name",
-            unit_measure AS "UnitMeasure",
-            department_name AS "DepartmentName",
-            quantity AS "Quantity",
-            unit_cost AS "UnitCost",
-            total_cost AS "TotalCost"
-        FROM sp_get_receipt_voucher_lines({0}::bigint)
-        """;
-
-    public async Task<byte[]?> GenerateReceiptVoucherPdf(long receiptId)
-    {
-        QuestPDF.Settings.License = LicenseType.Community;
-
-        var receipt = await _unitOfWork.Repository<Receipt>().GetByIdAsync(receiptId);
-        if (receipt is null)
-        {
-            return null;
-        }
-
-        var lines = await _unitOfWork.SqlQueryAsync<ReceiptVoucherLineDto>(GetReceiptVoucherLinesSql, receiptId);
-
-        var warehouseName = "—";
-        if (receipt.WarehouseId.HasValue)
-        {
-            var warehouse = await _unitOfWork.Repository<Warehouse>().GetByIdAsync(receipt.WarehouseId.Value);
-            warehouseName = warehouse?.Name ?? warehouseName;
-        }
-
-        var supplierName = "—";
-        if (receipt.SupplierId.HasValue)
-        {
-            var supplier = await _unitOfWork.Repository<Supplier>().GetByIdAsync(receipt.SupplierId.Value);
-            supplierName = supplier?.LegalName ?? supplierName;
-        }
-
-        var receiptTypeName = "—";
-        if (receipt.ReceiptTypeId.HasValue)
-        {
-            var receiptType = await _unitOfWork.Repository<ReceiptType>().GetByIdAsync(receipt.ReceiptTypeId.Value);
-            receiptTypeName = receiptType?.Name ?? receiptTypeName;
-        }
-
-        // El nombre de quien "Recibí Conforme" se preimprime con el usuario que registró la
-        // entrada en el sistema — Departamento Contable queda en blanco para firma manual,
-        // igual que en el formato en papel que ya usa el cliente.
-        var receivedByName = "—";
-        if (receipt.CreatedById.HasValue)
-        {
-            var creator = await _unitOfWork.Repository<AppUser>().GetByIdAsync(receipt.CreatedById.Value);
-            if (creator is not null)
-            {
-                receivedByName = $"{creator.FirstName} {creator.LastName}".Trim();
-            }
-        }
-
-        var username = "—";
-        if (_currentUserService.AppUserId.HasValue)
-        {
-            var user = await _unitOfWork.Repository<AppUser>().GetByIdAsync(_currentUserService.AppUserId.Value);
-            username = user?.Username ?? username;
-        }
-
-        var total = lines.Sum(l => l.TotalCost);
-
-        var document = Document.Create(container =>
-        {
-            container.Page(page =>
-            {
-                page.Size(PageSizes.Letter);
-                page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(9));
-
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.Spacing(12);
-                        row.ConstantItem(65).Height(48).Image(GetLogoBytes()).FitArea();
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(10);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(10);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(10);
-                        });
-                        row.ConstantItem(110).Height(48).Border(1).BorderColor(Colors.Grey.Darken1).Padding(6).Column(c =>
-                        {
-                            c.Item().AlignCenter().Text("NRO. DE ENTRADA").FontSize(7).FontColor(Colors.Grey.Darken2);
-                            c.Item().AlignCenter().Text(receiptId.ToString()).Bold().FontSize(16);
-                        });
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("INGRESO A ALMACÉN").Bold().FontSize(14);
-                });
-
-                page.Content().PaddingTop(10).Column(mainColumn =>
-                {
-                    mainColumn.Item().PaddingBottom(6).Row(row =>
-                    {
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("ALMACÉN: ").Bold();
-                            t.Span(warehouseName);
-                        });
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("FECHA: ").Bold();
-                            t.Span(receipt.IssueDate.ToString("dd/MM/yyyy"));
-                        });
-                    });
-
-                    mainColumn.Item().PaddingBottom(6).Row(row =>
-                    {
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("PROVEEDOR: ").Bold();
-                            t.Span(supplierName);
-                        });
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("TIPO DE INGRESO: ").Bold();
-                            t.Span(receiptTypeName);
-                        });
-                    });
-
-                    if (!string.IsNullOrWhiteSpace(receipt.Description))
-                    {
-                        mainColumn.Item().PaddingBottom(6).Text(t =>
-                        {
-                            t.Span("DESCRIPCIÓN GENERAL: ").Bold();
-                            t.Span(receipt.Description);
-                        });
-                    }
-
-                    mainColumn.Item().PaddingTop(6).Table(table =>
-                    {
-                        table.ColumnsDefinition(columns =>
-                        {
-                            columns.ConstantColumn(42);
-                            columns.ConstantColumn(80);
-                            columns.RelativeColumn(1);
-                            columns.ConstantColumn(58);
-                            columns.ConstantColumn(48);
-                            columns.ConstantColumn(68);
-                            columns.ConstantColumn(68);
-                        });
-
-                        table.Header(header =>
-                        {
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CÓDIGO");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DEPT.");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DESCRIPCIÓN");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("UNIDAD\nDE MEDIDA");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CANTIDAD");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("VALOR\nUNITARIO (Bs.)");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("VALOR\nTOTAL (Bs.)");
-                        });
-
-                        foreach (var line in lines)
-                        {
-                            table.Cell().Element(VoucherBodyCell).Text(line.Code ?? "—");
-                            table.Cell().Element(VoucherBodyCell).Text(line.DepartmentName ?? "—");
-                            table.Cell().Element(VoucherBodyCell).Text(line.Name);
-                            table.Cell().Element(VoucherBodyCell).AlignCenter().Text(line.UnitMeasure ?? "—");
-                            table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.Quantity.ToString("N2", ReportCulture));
-                            table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.UnitCost.ToString("N2", ReportCulture));
-                            table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.TotalCost.ToString("N2", ReportCulture));
-                        }
-
-                        table.Cell().ColumnSpan(6).Element(VoucherTotalCell).AlignRight().Text("TOTALES (Bs.)").Bold();
-                        table.Cell().Element(VoucherTotalCell).AlignRight().Text(total.ToString("N2", ReportCulture)).Bold();
-                    });
-
-                    mainColumn.Item().PaddingTop(40).Row(row =>
-                    {
-                        row.RelativeItem().Column(c => SignatureBox(c, receivedByName));
-                        row.ConstantItem(20);
-                        row.RelativeItem().Column(c => SignatureBox(c, null));
-                    });
-                });
-
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
-            });
-        });
-
-        return WithTitle(document, $"Ingreso a Almacén N° {receiptId.ToString().PadLeft(5, '0')}").GeneratePdf();
     }
 
     private const string GetIssueVoucherLinesSql = """
@@ -1497,7 +1121,9 @@ public partial class ReportService : IReportService
         FROM sp_get_issue_voucher_lines({0}::bigint)
         """;
 
-    public async Task<byte[]?> GenerateIssueVoucherPdf(long issueId, long? printTypeId = null)
+    /// <param name="publicBaseUrl">Dirección del sistema: con ella el comprobante en hoja lleva un QR que
+    /// abre la salida con sus fotos y firmas (igual que la nota de ingreso).</param>
+    public async Task<byte[]?> GenerateIssueVoucherPdf(long issueId, long? printTypeId = null, string? publicBaseUrl = null)
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
@@ -1576,11 +1202,14 @@ public partial class ReportService : IReportService
         // (SIN) que este sistema no gestiona, y no deben inventarse.
         var isRoll = printTypeName.Equals("Impresion Rollo", StringComparison.OrdinalIgnoreCase);
 
+        var signatures = await LoadSignaturesAsync(DocumentReviews.Issue, issueId, issue.ReviewVersion);
+
         var document = isRoll
             ? BuildIssueVoucherRollDocument(issueId, printTypeName, issue, lines, total, warehouseName, clientName, username)
-            : BuildIssueVoucherFullPageDocument(issueId, printTypeName, issueTypeName, issue, lines, total, warehouseName, clientName, inventoryManagerName, username);
+            : BuildIssueVoucherFullPageDocument(issueId, printTypeName, issueTypeName, issue, lines, total, warehouseName, clientName, inventoryManagerName, username, signatures,
+                string.IsNullOrWhiteSpace(publicBaseUrl) ? null : QrPng($"{publicBaseUrl.TrimEnd('/')}/issues/view/{issueId}"));
 
-        return WithTitle(document, $"Salida de Almacén N° {issueId.ToString().PadLeft(5, '0')}").GeneratePdf();
+        return WithTitle(document, $"Salida de Almacén N° {IssueNumbering.Format(issue.MonthlyNumber, issue.IssueDate, issueId)}").GeneratePdf();
     }
 
     private static Document BuildIssueVoucherFullPageDocument(
@@ -1593,125 +1222,47 @@ public partial class ReportService : IReportService
         string warehouseName,
         string clientName,
         string inventoryManagerName,
-        string username)
+        string username,
+        DocumentSignatures signatures,
+        byte[]? qr)
     {
-        return Document.Create(container =>
-        {
-            container.Page(page =>
-            {
-                page.Size(PageSizes.Letter);
-                page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(9));
-
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.Spacing(12);
-                        row.ConstantItem(65).Height(48).Image(GetLogoBytes()).FitArea();
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(10);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(10);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(10);
-                        });
-                        row.ConstantItem(110).Height(48).Border(1).BorderColor(Colors.Grey.Darken1).Padding(6).Column(c =>
-                        {
-                            c.Item().AlignCenter().Text("NRO. DE SALIDA").FontSize(7).FontColor(Colors.Grey.Darken2);
-                            c.Item().AlignCenter().Text(issueId.ToString()).Bold().FontSize(16);
-                        });
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("SALIDA DE ALMACÉN").Bold().FontSize(14);
-                });
-
-                page.Content().PaddingTop(10).Column(mainColumn =>
-                {
-                    mainColumn.Item().PaddingBottom(6).Row(row =>
-                    {
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("ALMACÉN: ").Bold();
-                            t.Span(warehouseName);
-                        });
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("FECHA: ").Bold();
-                            t.Span(issue.IssueDate.ToString("dd/MM/yyyy"));
-                        });
-                    });
-
-                    mainColumn.Item().PaddingBottom(6).Text(t =>
-                    {
-                        t.Span("TIPO DE SALIDA: ").Bold();
-                        t.Span(issueTypeName);
-                    });
-
-                    mainColumn.Item().PaddingBottom(6).Text(t =>
-                    {
-                        t.Span("DESCRIPCIÓN GENERAL: ").Bold();
-                        t.Span(string.IsNullOrWhiteSpace(issue.Description) ? "-" : issue.Description);
-                    });
-
-                    mainColumn.Item().PaddingTop(6).Table(table =>
-                    {
-                        table.ColumnsDefinition(columns =>
-                        {
-                            columns.ConstantColumn(42);
-                            columns.ConstantColumn(80);
-                            columns.RelativeColumn(1);
-                            columns.ConstantColumn(58);
-                            columns.ConstantColumn(48);
-                            columns.ConstantColumn(68);
-                            columns.ConstantColumn(68);
-                        });
-
-                        table.Header(header =>
-                        {
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CÓDIGO");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DEPT.");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DESCRIPCIÓN");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("UNIDAD\nDE MEDIDA");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CANTIDAD");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("VALOR\nUNITARIO (Bs.)");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("VALOR\nTOTAL (Bs.)");
-                        });
-
-                        foreach (var line in lines)
-                        {
-                            table.Cell().Element(VoucherBodyCell).Text(line.Code ?? "—");
-                            table.Cell().Element(VoucherBodyCell).Text(line.DepartmentName ?? "—");
-                            table.Cell().Element(VoucherBodyCell).Text(line.Name);
-                            table.Cell().Element(VoucherBodyCell).AlignCenter().Text(line.UnitMeasure ?? "—");
-                            table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.Quantity.ToString("N2", ReportCulture));
-                            table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.UnitCost.ToString("N2", ReportCulture));
-                            table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.TotalCost.ToString("N2", ReportCulture));
-                        }
-
-                        table.Cell().ColumnSpan(6).Element(VoucherTotalCell).AlignRight().Text("TOTALES (Bs.)").Bold();
-                        table.Cell().Element(VoucherTotalCell).AlignRight().Text(total.ToString("N2", ReportCulture)).Bold();
-                    });
-
-                    mainColumn.Item().PaddingTop(40).Row(row =>
-                    {
-                        row.RelativeItem().Column(c => SignatureBox(c, clientName));
-                        row.ConstantItem(20);
-                        row.RelativeItem().Column(c => SignatureBox(c, inventoryManagerName));
-                    });
-                });
-
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
-            });
-        });
+        // Media carta, como la nota de ingreso. "Recibí conforme" es el cliente; "Responsable de
+        // inventarios", quien registró la salida.
+        return BuildHalfLetterVoucher(new HalfLetterVoucher(
+            Title: "SALIDA DE ALMACÉN",
+            NumberLabel: "NRO. DE SALIDA",
+            NumberText: IssueNumbering.Format(issue.MonthlyNumber, issue.IssueDate, issueId),
+            NumberSubText: null,
+            InfoRows:
+            [
+                [("ALMACÉN", warehouseName), ("FECHA", issue.IssueDate.ToString("dd/MM/yyyy"))],
+                [("CLIENTE", clientName), ("TIPO DE SALIDA", issueTypeName)],
+            ],
+            Note: issue.Description,
+            Columns:
+            [
+                new VoucherColumn("CÓDIGO", 50),
+                new VoucherColumn("DESCRIPCIÓN", null),
+                new VoucherColumn("UNIDAD", 54, AlignCenter: true),
+                new VoucherColumn("CANTIDAD", 46, AlignRight: true),
+                new VoucherColumn("COSTO\nUNIT. (Bs.)", 56, AlignRight: true),
+                new VoucherColumn("COSTO\nTOTAL (Bs.)", 62, AlignRight: true),
+            ],
+            Rows: lines.Select(line => new VoucherRow(
+            [
+                line.Code ?? "—",
+                line.Name,
+                line.UnitMeasure ?? "—",
+                Qty(line.Quantity),
+                line.UnitCost.ToString("N2", ReportCulture),
+                line.TotalCost.ToString("N2", ReportCulture),
+            ], line.TotalCost)).ToList(),
+            TotalLabel: "TOTAL (Bs.)",
+            RowsOnLastPage: 30,
+            Signatures: column => DeliveryAndDigitalSignatures(
+                column, clientName, "RECIBÍ CONFORME", inventoryManagerName, "RESPONSABLE DE INVENTARIOS", signatures),
+            PrintedBy: username,
+            Qr: qr));
     }
 
     // Rollo térmico angosto (80mm) para "Impresion Rollo" — solo el estilo visual del ejemplo
@@ -1735,7 +1286,7 @@ public partial class ReportService : IReportService
                 page.ContinuousSize(227);
                 page.MarginHorizontal(10);
                 page.MarginVertical(8);
-                page.DefaultTextStyle(x => x.FontSize(8));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(8));
 
                 page.Header().Column(column =>
                 {
@@ -1756,7 +1307,7 @@ public partial class ReportService : IReportService
                     mainColumn.Item().Text(t =>
                     {
                         t.Span("N° Salida: ").Bold();
-                        t.Span(issueId.ToString());
+                        t.Span(IssueNumbering.Format(issue.MonthlyNumber, issue.IssueDate, issueId));
                     });
                     mainColumn.Item().Text(t =>
                     {
@@ -1796,7 +1347,7 @@ public partial class ReportService : IReportService
 
                         foreach (var line in lines)
                         {
-                            table.Cell().PaddingTop(1).Text(line.Quantity.ToString("N2", ReportCulture)).FontSize(7);
+                            table.Cell().PaddingTop(1).Text(Qty(line.Quantity)).FontSize(7);
                             table.Cell().PaddingTop(1).Text(line.Name).FontSize(7);
                             table.Cell().PaddingTop(1).AlignRight().Text(line.UnitCost.ToString("N2", ReportCulture)).FontSize(7);
                             table.Cell().PaddingTop(1).AlignRight().Text(line.TotalCost.ToString("N2", ReportCulture)).FontSize(7);
@@ -1953,31 +1504,8 @@ public partial class ReportService : IReportService
             }
         }
 
-        // El formulario de "Nueva transferencia" solo pide un Cliente como destinatario
-        // (ReceiverClientId) — ReceiverUserId existe en el esquema pero no lo llena esta
-        // pantalla; se deja como respaldo por si algún día se usa.
-        var receiverName = "—";
-        var receiverEmail = "—";
-        if (transfer.ReceiverClientId.HasValue)
-        {
-            var client = await _unitOfWork.Repository<Client>().GetByIdAsync(transfer.ReceiverClientId.Value);
-            if (client is not null)
-            {
-                var party = await _unitOfWork.Repository<Party>().GetByIdAsync(client.PartyId);
-                receiverName = party?.Name ?? receiverName;
-                receiverEmail = party?.Email ?? receiverEmail;
-            }
-        }
-        else if (transfer.ReceiverUserId.HasValue)
-        {
-            var receiver = await _unitOfWork.Repository<AppUser>().GetByIdAsync(transfer.ReceiverUserId.Value);
-            if (receiver is not null)
-            {
-                receiverName = $"{receiver.FirstName} {receiver.LastName}".Trim();
-                receiverEmail = receiver.Email;
-            }
-        }
-
+        // Las transferencias son internas, entre almacenes propios: ya no hay un receptor elegido.
+        // La firma de quien recibe queda en blanco para el encargado del almacén de destino.
         var username = "—";
         if (_currentUserService.AppUserId.HasValue)
         {
@@ -1986,176 +1514,47 @@ public partial class ReportService : IReportService
         }
 
         var total = lines.Sum(l => l.TotalSalePrice);
+        var signatures = await LoadSignaturesAsync(DocumentReviews.Transfer, transferId, transfer.ReviewVersion);
 
-        var document = Document.Create(container =>
-        {
-            container.Page(page =>
-            {
-                page.Size(PageSizes.Letter);
-                page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(9));
-
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.Spacing(12);
-                        row.ConstantItem(65).Height(48).Image(GetLogoBytes()).FitArea();
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(10);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(10);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(10);
-                        });
-                        row.ConstantItem(110).Height(48).Border(1).BorderColor(Colors.Grey.Darken1).Padding(6).Column(c =>
-                        {
-                            c.Item().AlignCenter().Text("TRANSFERENCIA N°").FontSize(7).FontColor(Colors.Grey.Darken2);
-                            c.Item().AlignCenter().Text(transferId.ToString()).Bold().FontSize(16);
-                        });
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("TRANSFERENCIA DE ALMACÉN").Bold().FontSize(14);
-                });
-
-                page.Content().PaddingTop(10).Column(mainColumn =>
-                {
-                    mainColumn.Item().PaddingBottom(6).Row(row =>
-                    {
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("ALMACÉN DE ORIGEN: ").Bold();
-                            t.Span(sourceWarehouseName);
-                        });
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("FECHA: ").Bold();
-                            t.Span(BoliviaTime.FromUtc(transfer.TransferDate).ToString("dd/MM/yyyy"));
-                        });
-                    });
-
-                    mainColumn.Item().PaddingBottom(6).Text(t =>
-                    {
-                        t.Span("ALMACÉN DE DESTINO: ").Bold();
-                        t.Span(destinationWarehouseName);
-                    });
-
-                    mainColumn.Item().PaddingBottom(6).Row(row =>
-                    {
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("ENVÍA: ").Bold();
-                            t.Span(senderName);
-                        });
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("CORREO: ").Bold();
-                            t.Span(senderEmail);
-                        });
-                    });
-
-                    mainColumn.Item().PaddingBottom(6).Row(row =>
-                    {
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("RECIBE: ").Bold();
-                            t.Span(receiverName);
-                        });
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("CORREO: ").Bold();
-                            t.Span(receiverEmail);
-                        });
-                    });
-
-                    if (!string.IsNullOrWhiteSpace(transfer.Notes))
-                    {
-                        mainColumn.Item().PaddingBottom(6).Text(t =>
-                        {
-                            t.Span("OBSERVACIONES: ").Bold();
-                            t.Span(transfer.Notes);
-                        });
-                    }
-
-                    mainColumn.Item().PaddingTop(6).Table(table =>
-                    {
-                        table.ColumnsDefinition(columns =>
-                        {
-                            columns.ConstantColumn(42);
-                            columns.ConstantColumn(80);
-                            columns.RelativeColumn(1);
-                            columns.ConstantColumn(58);
-                            columns.ConstantColumn(48);
-                            columns.ConstantColumn(68);
-                            columns.ConstantColumn(68);
-                        });
-
-                        table.Header(header =>
-                        {
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CÓDIGO");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DEPT.");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DESCRIPCIÓN");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("UNIDAD\nDE MEDIDA");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CANTIDAD");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("PRECIO DE\nVENTA (Bs.)");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("TOTAL\nP.V.P. (Bs.)");
-                        });
-
-                        foreach (var line in lines)
-                        {
-                            table.Cell().Element(VoucherBodyCell).Text(line.Code ?? "—");
-                            table.Cell().Element(VoucherBodyCell).Text(line.DepartmentName ?? "—");
-                            table.Cell().Element(VoucherBodyCell).Text(line.Name);
-                            table.Cell().Element(VoucherBodyCell).AlignCenter().Text(line.UnitMeasure ?? "—");
-                            table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.Quantity.ToString("N2", ReportCulture));
-                            table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.UnitPrice.ToString("N2", ReportCulture));
-                            table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.TotalSalePrice.ToString("N2", ReportCulture));
-                        }
-
-                        table.Cell().ColumnSpan(6).Element(VoucherTotalCell).AlignRight().Text("TOTAL (Bs.)").Bold();
-                        table.Cell().Element(VoucherTotalCell).AlignRight().Text(total.ToString("N2", ReportCulture)).Bold();
-                    });
-
-                    mainColumn.Item().PaddingTop(40).Row(row =>
-                    {
-                        row.RelativeItem().Column(c => SignatureBox(c, senderName));
-                        row.ConstantItem(20);
-                        row.RelativeItem().Column(c => SignatureBox(c, receiverName));
-                    });
-                });
-
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
-            });
-        });
+        // Media carta, como la nota de ingreso. Orden pedido: cantidad primero, luego descripción;
+        // sin código y con costos (no precios de venta).
+        var document = BuildHalfLetterVoucher(new HalfLetterVoucher(
+            Title: "TRANSFERENCIA DE ALMACÉN",
+            NumberLabel: "TRANSFERENCIA N°",
+            NumberText: transferId.ToString().PadLeft(5, '0'),
+            NumberSubText: null,
+            InfoRows:
+            [
+                [("ORIGEN", sourceWarehouseName), ("DESTINO", destinationWarehouseName), ("FECHA", BoliviaTime.FromUtc(transfer.TransferDate).ToString("dd/MM/yyyy"))],
+                [("ENVÍA", senderName), ("CORREO", senderEmail)],
+            ],
+            Note: transfer.Notes,
+            Columns:
+            [
+                new VoucherColumn("CANTIDAD", 50, AlignRight: true),
+                new VoucherColumn("UNIDAD", 54, AlignCenter: true),
+                new VoucherColumn("DESCRIPCIÓN", null),
+                new VoucherColumn("DEPT.", 80),
+                new VoucherColumn("COSTO\nUNIT. (Bs.)", 56, AlignRight: true),
+                new VoucherColumn("COSTO\nTOTAL (Bs.)", 62, AlignRight: true),
+            ],
+            Rows: lines.Select(line => new VoucherRow(
+            [
+                Qty(line.Quantity),
+                line.UnitMeasure ?? "—",
+                line.Name,
+                line.DepartmentName ?? "—",
+                line.UnitPrice.ToString("N2", ReportCulture),
+                line.TotalSalePrice.ToString("N2", ReportCulture),
+            ], line.TotalSalePrice)).ToList(),
+            TotalLabel: "TOTAL (Bs.)",
+            RowsOnLastPage: 30,
+            Signatures: column => DeliveryAndDigitalSignatures(
+                column, senderName, "ENTREGADO POR", null, "RECIBIDO POR (ALMACÉN DE DESTINO)", signatures),
+            PrintedBy: username,
+            Qr: null));
 
         return WithTitle(document, $"Transferencia N° {transferId.ToString().PadLeft(5, '0')}").GeneratePdf();
-    }
-
-    // Grid completo (no solo borde inferior como HeaderCell/BodyCell) para que el comprobante
-    // de impresión de una Entrada se vea como una tabla formal impresa, igual que el formato
-    // en papel que ya usa el cliente — a diferencia de los reportes agregados, que son listas
-    // largas donde un grid completo sería visualmente pesado.
-    private static IContainer VoucherHeaderCell(IContainer container) =>
-        container.Border(1).BorderColor(Colors.Black).Background(Colors.Grey.Lighten3).Padding(4).MinHeight(28).DefaultTextStyle(x => x.Bold().FontSize(7));
-
-    private static IContainer VoucherBodyCell(IContainer container) =>
-        container.Border(1).BorderColor(Colors.Grey.Darken1).Padding(4).DefaultTextStyle(x => x.FontSize(8));
-
-    private static IContainer VoucherTotalCell(IContainer container) =>
-        container.Border(1).BorderColor(Colors.Black).Background(Colors.Grey.Lighten2).Padding(4).DefaultTextStyle(x => x.FontSize(8));
-
-    private static void SignatureBox(QuestPDF.Fluent.ColumnDescriptor column, string? name)
-    {
-        column.Item().Height(28);
-        column.Item().BorderTop(1).BorderColor(Colors.Grey.Darken1).PaddingTop(2).AlignCenter().Text(name ?? "").FontSize(8);
     }
 
     // "late" no se guarda en account_receivable.status (ver sp_get_account_receivables en
@@ -2258,33 +1657,17 @@ public partial class ReportService : IReportService
             _ => "Todo el historial"
         };
 
+        var noteNumbers = await ReceiptNoteNumbersAsync(rows.Where(r => r.MovementType == "receipt").Select(r => r.VoucherId));
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
             {
                 page.Size(PageSizes.Letter.Landscape());
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(8));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(8));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(11);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(11);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(11);
-                        });
-                        row.ConstantItem(140).Height(45).Image(GetLogoBytes()).FitArea();
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("KARDEX POR MATERIAL").Bold().FontSize(14);
-                    column.Item().AlignCenter().Text($"Producto: {productLabel}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Almacén: {warehouseName}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Periodo: {periodText}").FontSize(10);
-                    column.Item().AlignCenter().Text("(Expresado en Bolivianos)").FontSize(9).Italic();
-                });
+                page.Header().Element(c => ReportHeader(c, "Kardex por Material", $"Producto: {productLabel}", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -2314,13 +1697,13 @@ public partial class ReportService : IReportService
                         header.Cell().Element(HeaderCell).Text("Fecha");
                         header.Cell().Element(HeaderCell).AlignCenter().Text("N°\nComprobante");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Total");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Total");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
+                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Total");
                     });
 
@@ -2334,7 +1717,7 @@ public partial class ReportService : IReportService
                     table.Cell().Element(BodyCell).Text("");
                     table.Cell().Element(BodyCell).Text("");
                     table.Cell().Element(BodyCell).Text("");
-                    table.Cell().Element(BodyCell).AlignRight().Text(opening.OpeningQuantity.ToString("N2", ReportCulture));
+                    table.Cell().Element(BodyCell).AlignRight().Text(Qty(opening.OpeningQuantity));
                     table.Cell().Element(BodyCell).AlignRight().Text(openingUnitValue.ToString("N2", ReportCulture));
                     table.Cell().Element(BodyCell).AlignRight().Text(opening.OpeningValue.ToString("N2", ReportCulture));
 
@@ -2344,29 +1727,20 @@ public partial class ReportService : IReportService
                         var balanceUnitValue = row.BalanceQuantity == 0 ? 0 : row.BalanceValue / row.BalanceQuantity;
 
                         table.Cell().Element(BodyCell).Text(row.VoucherDate.ToString("dd/MM/yyyy"));
-                        table.Cell().Element(BodyCell).Text(row.VoucherId.ToString().PadLeft(5, '0'));
-                        table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? row.Quantity.ToString("N2", ReportCulture) : "");
+                        table.Cell().Element(BodyCell).Text(row.MovementType == "receipt" ? noteNumbers.GetValueOrDefault(row.VoucherId, row.VoucherId.ToString()) : row.VoucherId.ToString().PadLeft(5, '0'));
+                        table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? Qty(row.Quantity) : "");
                         table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? row.UnitCost.ToString("N2", ReportCulture) : "");
                         table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? row.TotalCost.ToString("N2", ReportCulture) : "");
-                        table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? row.Quantity.ToString("N2", ReportCulture) : "");
+                        table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? Qty(row.Quantity) : "");
                         table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? row.UnitCost.ToString("N2", ReportCulture) : "");
                         table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? row.TotalCost.ToString("N2", ReportCulture) : "");
-                        table.Cell().Element(BodyCell).AlignRight().Text(row.BalanceQuantity.ToString("N2", ReportCulture));
+                        table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.BalanceQuantity));
                         table.Cell().Element(BodyCell).AlignRight().Text(balanceUnitValue.ToString("N2", ReportCulture));
                         table.Cell().Element(BodyCell).AlignRight().Text(row.BalanceValue.ToString("N2", ReportCulture));
                     }
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
@@ -2410,6 +1784,7 @@ public partial class ReportService : IReportService
 
     public async Task<PastorFieldReportDataDto> GetPastorFieldReportData(PastorFieldReportQueryFilter filter)
     {
+        await LoadIssueNumbersAsync();
         var receivables = await _unitOfWork.SqlQueryAsync<PastorFieldReceivableRowDto>(
             GetPastorFieldReceivablesSql, filter.ClientId);
 
@@ -2482,25 +1857,9 @@ public partial class ReportService : IReportService
             {
                 page.Size(PageSizes.Letter);
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(9));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(9));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(11);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(11);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(11);
-                        });
-                        row.ConstantItem(140).Height(45).Image(GetLogoBytes()).FitArea();
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("REPORTE CAMPO PASTOR").Bold().FontSize(14);
-                    column.Item().AlignCenter().Text($"Pastor / Cliente: {clientName}").FontSize(10);
-                    column.Item().AlignCenter().Text("(Expresado en Bolivianos)").FontSize(9).Italic();
-                });
+                page.Header().Element(c => ReportHeader(c, "Reporte Campo Pastor", $"Pastor / Cliente: {clientName}"));
 
                 page.Content().PaddingTop(10).Column(mainColumn =>
                 {
@@ -2508,7 +1867,7 @@ public partial class ReportService : IReportService
 
                     mainColumn.Item().Column(section =>
                     {
-                        section.Item().Text("Cuentas por Cobrar").Bold().FontSize(12);
+                        section.Item().Element(c => SectionTitle(c, "Cuentas por Cobrar"));
 
                         section.Item().PaddingTop(6).Table(table =>
                         {
@@ -2532,7 +1891,7 @@ public partial class ReportService : IReportService
 
                             foreach (var row in data.Receivables)
                             {
-                                table.Cell().Element(BodyCell).Text(row.IssueId.HasValue ? row.IssueId.Value.ToString().PadLeft(5, '0') : "—");
+                                table.Cell().Element(BodyCell).Text(IssueNo(row.IssueId));
                                 table.Cell().Element(BodyCell).Text(row.IssueDate.HasValue ? row.IssueDate.Value.ToString("dd/MM/yyyy") : "—");
                                 table.Cell().Element(BodyCell).Text(row.DueDate.HasValue ? row.DueDate.Value.ToString("dd/MM/yyyy") : "—");
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.OutstandingBalance.ToString("N2", ReportCulture));
@@ -2558,7 +1917,7 @@ public partial class ReportService : IReportService
 
                     mainColumn.Item().Column(section =>
                     {
-                        section.Item().Text("Entregas").Bold().FontSize(12);
+                        section.Item().Element(c => SectionTitle(c, "Entregas"));
 
                         section.Item().PaddingTop(6).Table(table =>
                         {
@@ -2578,7 +1937,7 @@ public partial class ReportService : IReportService
 
                             foreach (var row in data.Deliveries)
                             {
-                                table.Cell().Element(BodyCell).Text(row.IssueId.ToString().PadLeft(5, '0'));
+                                table.Cell().Element(BodyCell).Text(IssueNo(row.IssueId));
                                 table.Cell().Element(BodyCell).Text(row.IssueDate.ToString("dd/MM/yyyy"));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.Total.ToString("N2", ReportCulture));
                             }
@@ -2587,7 +1946,7 @@ public partial class ReportService : IReportService
 
                     mainColumn.Item().Column(section =>
                     {
-                        section.Item().Text("Depósitos").Bold().FontSize(12);
+                        section.Item().Element(c => SectionTitle(c, "Depósitos"));
 
                         section.Item().PaddingTop(6).Table(table =>
                         {
@@ -2612,7 +1971,7 @@ public partial class ReportService : IReportService
                             foreach (var row in data.Deposits)
                             {
                                 table.Cell().Element(BodyCell).Text(BoliviaTime.FromUtc(row.PaymentDate).ToString("dd/MM/yyyy"));
-                                table.Cell().Element(BodyCell).Text(row.IssueId.HasValue ? row.IssueId.Value.ToString().PadLeft(5, '0') : "—");
+                                table.Cell().Element(BodyCell).Text(IssueNo(row.IssueId));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.Amount.ToString("N2", ReportCulture));
                                 table.Cell().Element(BodyCell).Text(PaymentMethodLabel(row.PaymentMethod));
                                 table.Cell().Element(BodyCell).Text(row.Notes ?? "");
@@ -2621,16 +1980,7 @@ public partial class ReportService : IReportService
                     });
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
@@ -2659,6 +2009,7 @@ public partial class ReportService : IReportService
     // no se genere al entrar el historial completo de cuentas ya pagadas.
     public async Task<List<AccountReceivablesReportRowDto>> GetAccountReceivablesReport(AccountReceivablesReportQueryFilter filter)
     {
+        await LoadIssueNumbersAsync();
         var onlyOpen = filter.Status == "open";
         var rows = await _unitOfWork.SqlQueryAsync<AccountReceivablesReportRowDto>(
             GetAccountReceivablesReportSql,
@@ -2810,28 +2161,11 @@ public partial class ReportService : IReportService
         {
             container.Page(page =>
             {
-                page.Size(PageSizes.Letter.Landscape());
-                page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(7));
+                page.Size(PageSizes.Letter);
+                page.Margin(24);
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(6.5f));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(11);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(11);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(11);
-                        });
-                        row.ConstantItem(140).Height(45).Image(GetLogoBytes()).FitArea();
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("REPORTE GENERAL DE CUENTAS POR COBRAR").Bold().FontSize(14);
-                    column.Item().AlignCenter().Text($"Cliente: {clientName}").FontSize(10);
-                    column.Item().AlignCenter().Text($"Estado: {statusLabel} — Fecha límite: {periodText}").FontSize(10);
-                    column.Item().AlignCenter().Text("(Expresado en Bolivianos)").FontSize(9).Italic();
-                });
+                page.Header().Element(c => ReportHeader(c, "Reporte General de Cuentas por Cobrar", $"Cliente: {clientName}", $"Estado: {statusLabel}", $"Fecha límite: {periodText}"));
 
                 page.Content().PaddingTop(10).Column(mainColumn =>
                 {
@@ -2841,18 +2175,18 @@ public partial class ReportService : IReportService
                     {
                         table.ColumnsDefinition(columns =>
                         {
-                            columns.ConstantColumn(38);
+                            columns.ConstantColumn(32);
                             columns.ConstantColumn(44);
                             columns.ConstantColumn(44);
-                            columns.ConstantColumn(34);
+                            columns.ConstantColumn(32);
                             columns.RelativeColumn(2);
-                            columns.ConstantColumn(42);
+                            columns.ConstantColumn(36);
+                            columns.ConstantColumn(36);
                             columns.ConstantColumn(40);
                             columns.ConstantColumn(44);
-                            columns.ConstantColumn(48);
-                            columns.ConstantColumn(48);
-                            columns.ConstantColumn(48);
-                            columns.ConstantColumn(52);
+                            columns.ConstantColumn(42);
+                            columns.ConstantColumn(44);
+                            columns.ConstantColumn(44);
                         });
 
                         table.Header(header =>
@@ -2864,8 +2198,8 @@ public partial class ReportService : IReportService
                             header.Cell().Element(HeaderCell).Text("Descripción");
                             header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                            header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nUnitario");
-                            header.Cell().Element(HeaderCell).AlignRight().Text("Valor\nTotal");
+                            header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
+                            header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Pagado");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Saldo");
                             header.Cell().Element(HeaderCell).AlignCenter().Text("Estado");
@@ -2874,7 +2208,7 @@ public partial class ReportService : IReportService
                         void TotalsRow(Func<IContainer, IContainer> style, string label, decimal quantity, decimal total, decimal paid, decimal balance)
                         {
                             table.Cell().ColumnSpan(leadColumns).Element(style).AlignRight().Text(label).Bold();
-                            table.Cell().Element(style).AlignRight().Text(quantity.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(style).AlignRight().Text(Qty(quantity)).Bold();
                             table.Cell().Element(style).Text("");
                             table.Cell().Element(style).AlignRight().Text(total.ToString("N2", ReportCulture)).Bold();
                             table.Cell().Element(style).AlignRight().Text(paid.ToString("N2", ReportCulture)).Bold();
@@ -2884,7 +2218,7 @@ public partial class ReportService : IReportService
 
                         foreach (var client in clients)
                         {
-                            table.Cell().ColumnSpan(totalColumns).Element(c => c.PaddingTop(8).PaddingBottom(2))
+                            table.Cell().ColumnSpan(totalColumns).Element(GroupTitleCell)
                                 .Text(client.Key).Bold().FontSize(10);
 
                             decimal qty = 0m, total = 0m, paid = 0m, balance = 0m;
@@ -2892,13 +2226,13 @@ public partial class ReportService : IReportService
                             foreach (var row in client.OrderBy(r => r.Account.IssueId).ThenBy(r => r.Name))
                             {
                                 var account = row.Account;
-                                table.Cell().Element(BodyCell).Text(account.IssueId.HasValue ? account.IssueId.Value.ToString().PadLeft(5, '0') : "—");
+                                table.Cell().Element(BodyCell).Text(IssueNo(account.IssueId));
                                 table.Cell().Element(BodyCell).Text(account.IssueDate.HasValue ? account.IssueDate.Value.ToString("dd/MM/yyyy") : "—");
                                 table.Cell().Element(BodyCell).Text(account.DueDate.HasValue ? account.DueDate.Value.ToString("dd/MM/yyyy") : "—");
                                 table.Cell().Element(BodyCell).Text(row.Code ?? "");
                                 table.Cell().Element(BodyCell).Text(row.Name);
                                 table.Cell().Element(BodyCell).Text(row.UnitMeasure ?? "");
-                                table.Cell().Element(BodyCell).AlignRight().Text(row.Quantity.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.Quantity));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.UnitCost.ToString("N2", ReportCulture));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.TotalCost.ToString("N2", ReportCulture));
                                 table.Cell().Element(BodyCell).AlignRight().Text(row.Paid.ToString("N2", ReportCulture));
@@ -2930,16 +2264,7 @@ public partial class ReportService : IReportService
                     });
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
@@ -3009,71 +2334,19 @@ public partial class ReportService : IReportService
             {
                 page.Size(PageSizes.Letter);
                 page.Margin(30);
-                page.DefaultTextStyle(x => x.FontSize(9));
+                page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(9));
 
-                page.Header().Column(column =>
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.Spacing(12);
-                        row.ConstantItem(65).Height(48).Image(GetLogoBytes()).FitArea();
-                        row.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("IGLESIA ADVENTISTA DEL SÉPTIMO DÍA").Bold().FontSize(10);
-                            c.Item().Text("MISIÓN BOLIVIANA OCCIDENTAL DEL SUR").Bold().FontSize(10);
-                            c.Item().Text("LA PAZ - BOLIVIA").Bold().FontSize(10);
-                        });
-                        row.ConstantItem(110).Height(48).Border(1).BorderColor(Colors.Grey.Darken1).Padding(6).Column(c =>
-                        {
-                            c.Item().AlignCenter().Text("N° CUENTA").FontSize(7).FontColor(Colors.Grey.Darken2);
-                            c.Item().AlignCenter().Text(accountReceivableId.ToString()).Bold().FontSize(16);
-                        });
-                    });
-
-                    column.Item().PaddingTop(10).AlignCenter().Text("CUENTA POR COBRAR").Bold().FontSize(14);
-                });
+                page.Header().Element(c => ReportHeader(c, $"Cuenta por Cobrar N° {accountReceivableId.ToString().PadLeft(5, '0')}",
+                    $"Cliente: {clientName}",
+                    $"N° salida: {(issue is not null ? IssueNumbering.Format(issue.MonthlyNumber, issue.IssueDate, issue.IssueId) : "—")}",
+                    $"Fecha: {(issue is not null ? issue.IssueDate.ToString("dd/MM/yyyy") : "—")}",
+                    $"Forma de pago: {paymentTypeLabel}",
+                    $"Fecha límite: {(accountReceivable.DueDate.HasValue ? accountReceivable.DueDate.Value.ToString("dd/MM/yyyy") : "—")}",
+                    $"Estado: {statusLabel}"));
 
                 page.Content().PaddingTop(10).Column(mainColumn =>
                 {
-                    mainColumn.Item().PaddingBottom(6).Row(row =>
-                    {
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("CLIENTE: ").Bold();
-                            t.Span(clientName);
-                        });
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("N° SALIDA: ").Bold();
-                            t.Span(issue is not null ? issue.IssueId.ToString().PadLeft(5, '0') : "—");
-                        });
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("FECHA: ").Bold();
-                            t.Span(issue is not null ? issue.IssueDate.ToString("dd/MM/yyyy") : "—");
-                        });
-                    });
-
-                    mainColumn.Item().PaddingBottom(10).Row(row =>
-                    {
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("FORMA DE PAGO: ").Bold();
-                            t.Span(paymentTypeLabel);
-                        });
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("FECHA LÍMITE: ").Bold();
-                            t.Span(accountReceivable.DueDate.HasValue ? accountReceivable.DueDate.Value.ToString("dd/MM/yyyy") : "—");
-                        });
-                        row.RelativeItem().Text(t =>
-                        {
-                            t.Span("ESTADO: ").Bold();
-                            t.Span(statusLabel);
-                        });
-                    });
-
-                    mainColumn.Item().Text("PRODUCTOS").Bold().FontSize(10);
+                    mainColumn.Item().Element(c => SectionTitle(c, "Productos"));
 
                     mainColumn.Item().PaddingTop(4).Table(table =>
                     {
@@ -3095,8 +2368,8 @@ public partial class ReportService : IReportService
                             header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DESCRIPCIÓN");
                             header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("UNIDAD\nDE MEDIDA");
                             header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CANTIDAD");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("VALOR\nUNITARIO (Bs.)");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("VALOR\nTOTAL (Bs.)");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("COSTO\nUNITARIO (Bs.)");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("COSTO\nTOTAL (Bs.)");
                         });
 
                         if (lines.Count == 0)
@@ -3111,7 +2384,7 @@ public partial class ReportService : IReportService
                                 table.Cell().Element(VoucherBodyCell).Text(line.DepartmentName ?? "—");
                                 table.Cell().Element(VoucherBodyCell).Text(line.Name);
                                 table.Cell().Element(VoucherBodyCell).AlignCenter().Text(line.UnitMeasure ?? "—");
-                                table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.Quantity.ToString("N2", ReportCulture));
+                                table.Cell().Element(VoucherBodyCell).AlignRight().Text(Qty(line.Quantity));
                                 table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.UnitCost.ToString("N2", ReportCulture));
                                 table.Cell().Element(VoucherBodyCell).AlignRight().Text(line.TotalCost.ToString("N2", ReportCulture));
                             }
@@ -3121,7 +2394,7 @@ public partial class ReportService : IReportService
                         }
                     });
 
-                    mainColumn.Item().PaddingTop(14).Text("PAGOS").Bold().FontSize(10);
+                    mainColumn.Item().PaddingTop(14).Element(c => SectionTitle(c, "Pagos"));
 
                     mainColumn.Item().PaddingTop(4).Table(table =>
                     {
@@ -3170,16 +2443,7 @@ public partial class ReportService : IReportService
                     });
                 });
 
-                page.Footer().PaddingTop(5).Row(row =>
-                {
-                    row.RelativeItem().Text($"Usuario: {username}").FontSize(8);
-                    row.RelativeItem().AlignCenter().Text($"{BoliviaTime.Now:dd/MM/yyyy}").FontSize(8);
-                    row.RelativeItem().AlignRight().Text(x =>
-                    {
-                        x.Span("Pág. ").FontSize(8);
-                        x.CurrentPageNumber().FontSize(8);
-                    });
-                });
+                page.Footer().Element(c => ReportFooter(c, username));
             });
         });
 
@@ -3203,39 +2467,10 @@ public partial class ReportService : IReportService
         return _logoBytes;
     }
 
-    // Grid completo + alto mínimo uniforme para que los encabezados de 1 y de 2 líneas
-    // queden centrados a la misma altura (mismo motivo por el que se hizo en los
-    // comprobantes de impresión: que la tabla se vea formal y simétrica).
-    private static IContainer HeaderCell(IContainer container) =>
-        container.Border(1).BorderColor(Colors.Grey.Darken1).Background(Colors.Grey.Lighten3).Padding(4).MinHeight(24).AlignMiddle().DefaultTextStyle(x => x.Bold());
-
-    private static IContainer BodyCell(IContainer container) =>
-        container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(3);
-
     // Título del PDF: lo muestran el visor del navegador y la pestaña en lugar del nombre interno
     // del archivo temporal (un código como "97402a5b-178a-..."), que no le dice nada al usuario.
     private static Document WithTitle(Document document, string title) =>
         document.WithMetadata(new DocumentMetadata { Title = title, Author = "InvenTrack" });
-
-    private static IContainer SubtotalCell(IContainer container) =>
-        container.Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten2).Padding(3);
-
-    private static IContainer CategoryTotalCell(IContainer container) =>
-        container.Border(1).BorderColor(Colors.Grey.Darken1).Background(Colors.Grey.Medium).Padding(3);
-
-    private static void SummaryTextCard(QuestPDF.Infrastructure.IContainer container, string label, string value)
-    {
-        container
-            .Border(1)
-            .BorderColor(Colors.Grey.Lighten2)
-            .Background(Colors.Grey.Lighten5)
-            .Padding(10)
-            .Column(column =>
-            {
-                column.Item().Text(label).FontSize(9).FontColor(Colors.Grey.Darken2);
-                column.Item().Text(value).FontSize(14).Bold();
-            });
-    }
 
     private async Task<FinancialDashboardSummaryDto> GetSummaryAsync()
     {

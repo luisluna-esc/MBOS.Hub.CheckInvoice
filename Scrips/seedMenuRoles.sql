@@ -83,7 +83,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO menu_role (menu_id, role_id)
 SELECT m.menu_id, r.role_id
 FROM menu m, role r
-WHERE m.name IN ('Reportes', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar')
+WHERE m.name IN ('Reportes', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Historial de Entradas', 'Historial de Salidas', 'Transferencias de Almacén', 'Salidas para Contabilidad', 'Ingresos para Contabilidad', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar')
   AND r.name IN ('Auxiliar Contador', 'Contador', 'Tesorero', 'M-BOS')
 ON CONFLICT DO NOTHING;
 
@@ -97,7 +97,7 @@ FROM menu m, role r
 WHERE m.name IN (
     'Configuración del Sistema', 'Países', 'Tipos de Documento', 'Tipos de Iglesia', 'Tipos de Impresión',
     'Tipos de Salida', 'Tipos de Entrada', 'Tipos de Medio', 'Departamentos', 'Subdepartamentos',
-    'Misiones', 'Provincias', 'Casos Especiales', 'Motivos de Anulación', 'Almacenes', 'Períodos de Almacén'
+    'Misiones', 'Provincias', 'Casos Especiales', 'Motivos de Anulación', 'Almacenes', 'Períodos de Almacén', 'Inventario Inicial'
   )
   AND r.name = 'M-BOS'
 ON CONFLICT DO NOTHING;
@@ -124,16 +124,52 @@ WHERE r.is_active
   AND r.name NOT IN ('Pastor', 'Caja')
   AND m.name NOT IN (
     'Usuarios', 'Roles', 'Permisos',
-    'Anulaciones',
-    'Anulaciones de Entradas',
+    'Anulaciones', 'Autorizaciones',
+    'Anulaciones de Entradas', 'Correcciones de Entradas', 'Anulaciones de Transferencias',
     'Ajuste de Inventario',
     'Devoluciones',
     'Cuentas por Cobrar',
     'Pastores',
     'Mi Cuenta',
-    'Reportes', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar',
+    'Reportes', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Historial de Entradas', 'Historial de Salidas', 'Transferencias de Almacén', 'Salidas para Contabilidad', 'Ingresos para Contabilidad', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar',
     'Configuración del Sistema', 'Países', 'Tipos de Documento', 'Tipos de Iglesia', 'Tipos de Impresión',
     'Tipos de Salida', 'Tipos de Entrada', 'Tipos de Medio', 'Departamentos', 'Subdepartamentos',
-    'Misiones', 'Provincias', 'Casos Especiales', 'Motivos de Anulación', 'Almacenes', 'Períodos de Almacén'
+    'Misiones', 'Provincias', 'Casos Especiales', 'Motivos de Anulación', 'Almacenes', 'Períodos de Almacén', 'Inventario Inicial'
   )
+ON CONFLICT DO NOTHING;
+
+-- Autorizaciones: el grupo lo ven los roles que ven alguna de las anulaciones.
+INSERT INTO menu_role (menu_id, role_id)
+SELECT DISTINCT g.menu_id, mr.role_id
+FROM menu g
+JOIN menu c ON c.name IN ('Anulaciones', 'Anulaciones de Entradas')
+JOIN menu_role mr ON mr.menu_id = c.menu_id
+WHERE g.name = 'Autorizaciones'
+ON CONFLICT DO NOTHING;
+
+-- Correcciones de Entradas: los mismos roles que las anulaciones de entradas.
+INSERT INTO menu_role (menu_id, role_id)
+SELECT c.menu_id, mr.role_id
+FROM menu c
+JOIN menu a ON a.name = 'Anulaciones de Entradas'
+JOIN menu_role mr ON mr.menu_id = a.menu_id
+WHERE c.name = 'Correcciones de Entradas'
+ON CONFLICT DO NOTHING;
+
+-- Correcciones de Salidas: los mismos roles que las correcciones de entradas.
+INSERT INTO menu_role (menu_id, role_id)
+SELECT c.menu_id, mr.role_id
+FROM menu c
+JOIN menu a ON a.name = 'Correcciones de Entradas'
+JOIN menu_role mr ON mr.menu_id = a.menu_id
+WHERE c.name = 'Correcciones de Salidas'
+ON CONFLICT DO NOTHING;
+
+-- Anulaciones de Transferencias: los mismos roles que las anulaciones de entradas.
+INSERT INTO menu_role (menu_id, role_id)
+SELECT t.menu_id, mr.role_id
+FROM menu t
+JOIN menu a ON a.name = 'Anulaciones de Entradas'
+JOIN menu_role mr ON mr.menu_id = a.menu_id
+WHERE t.name = 'Anulaciones de Transferencias'
 ON CONFLICT DO NOTHING;

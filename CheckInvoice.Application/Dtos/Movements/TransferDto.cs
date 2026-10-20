@@ -13,4 +13,8 @@ public class TransferDto
     public bool IsApproved { get; set; }
     public long? ApprovedById { get; set; }
     public DateTime? ApprovedAt { get; set; }
+    // Revisión: digitado, verificado o aprobado.
+    public string? ReviewStatus { get; set; }
+    public bool IsVoided { get; set; }
+    public bool HasPendingVoidRequest { get; set; }
 }

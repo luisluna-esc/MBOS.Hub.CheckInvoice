@@ -197,6 +197,11 @@ public static class DependencyInjection
         services.AddScoped<IPortalService, PortalService>();
 
         services.AddScoped<IChangeRequestService, ChangeRequestService>();
+        services.AddScoped<IDocumentReviewService, DocumentReviewService>();
+        services.AddScoped<IReceiptEditService, ReceiptEditService>();
+        services.AddScoped<IIssueEditService, IssueEditService>();
+        services.AddScoped<ITransferVoidRequestService, TransferVoidRequestService>();
+        services.AddScoped<IInboxService, InboxService>();
         services.AddScoped<IValidator<ChangeRequestCreateDto>, ChangeRequestCreateValidator>();
 
         return services;

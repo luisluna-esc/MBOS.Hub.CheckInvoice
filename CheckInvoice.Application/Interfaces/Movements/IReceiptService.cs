@@ -9,7 +9,10 @@ public interface IReceiptService
 {
     Task<ResponseGetObject> GetAllReceipts(PaginationQueryFilter paginationQueryFilter, ReceiptQueryFilter receiptQueryFilter);
     Task<ResponseGetObject> GetReceiptDetails(long receiptId);
+    Task<ResponseGetObject> GetReceiptSummary(long receiptId);
     Task<ResponsePost> InsertReceipt(ReceiptRequestDto receiptRequestDto);
     Task<ResponseGetObject> GetReturnableIssueLines(long issueId);
     Task<ResponsePost> InsertReturn(ReceiptReturnRequestDto receiptReturnRequestDto);
+    Task<byte[]> GetInitialInventoryTemplate();
+    Task<ResponseGetObject> ImportInitialInventory(Stream excel, long warehouseId, bool confirm);
 }

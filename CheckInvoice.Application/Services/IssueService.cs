@@ -47,6 +47,7 @@ public class IssueService : IIssueService
     private const string GetIssuesSql = """
         SELECT
             issue_id AS "IssueId",
+            NULL::varchar AS "NoteNumber",
             issue_type_id AS "IssueTypeId",
             warehouse_id AS "WarehouseId",
             warehouse_period_id AS "WarehousePeriodId",
@@ -64,6 +65,7 @@ public class IssueService : IIssueService
             has_pending_void_request AS "HasPendingVoidRequest",
             void_reason_name AS "VoidReasonName",
             void_detail AS "VoidDetail",
+            NULL::varchar AS "ReviewStatus",
             total_records AS "TotalRecords"
         FROM sp_get_issues({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::int, {5}::int, {6}::varchar)
         """;
@@ -77,6 +79,11 @@ public class IssueService : IIssueService
         // nombre del creador, cambios pendientes, total por salida, anulaciones pendientes,
         // anulaciones relevantes, motivo de anulación). Ahora es una sola consulta con joins
         // via sp_get_issues (Scrips/storedProcedures.sql).
+        if (!string.IsNullOrWhiteSpace(issueQueryFilter.NoteNumber))
+        {
+            issueQueryFilter.IssueId = await FindByNoteNumberAsync(issueQueryFilter.NoteNumber) ?? -1;
+        }
+
         var rows = await _unitOfWork.SqlQueryAsync<IssueGetAllRow>(
             GetIssuesSql,
             (object?)issueQueryFilter.IssueId ?? DBNull.Value,
@@ -99,6 +106,23 @@ public class IssueService : IIssueService
             row.CreatedAt = DateTime.SpecifyKind(row.CreatedAt, DateTimeKind.Utc);
         }
 
+        var pageIds = rows.Select(r => r.IssueId).ToList();
+        var extras = await _unitOfWork.Repository<Issue>().Query()
+            .Where(i => pageIds.Contains(i.IssueId))
+            .Select(i => new { i.IssueId, i.ReviewStatus, i.MonthlyNumber })
+            .ToDictionaryAsync(i => i.IssueId);
+        var pendingEdits = await _unitOfWork.Repository<ChangeRequest>().Query()
+            .Where(c => c.TableName == IssueEditService.TableName && c.Status == "pending" && pageIds.Contains(c.RecordId))
+            .Select(c => c.RecordId)
+            .ToListAsync();
+        foreach (var row in rows)
+        {
+            var extra = extras.GetValueOrDefault(row.IssueId);
+            row.ReviewStatus = extra?.ReviewStatus;
+            row.NoteNumber = IssueNumbering.Format(extra?.MonthlyNumber, row.IssueDate, row.IssueId);
+            row.HasPendingChangeRequest = row.HasPendingChangeRequest || pendingEdits.Contains(row.IssueId);
+        }
+
         return new ResponseGetObject
         {
             Data = new PagedResult<IssueDto>
@@ -107,6 +131,105 @@ public class IssueService : IIssueService
                 TotalRecords = totalRecords,
                 PageNumber = pageNumber,
                 PageSize = pageSize
+            },
+            Messages = [],
+            StatusCode = HttpStatusCode.OK
+        };
+    }
+
+    private async Task<long?> FindByNoteNumberAsync(string noteNumber)
+    {
+        if (!IssueNumbering.TryParse(noteNumber, out var number, out var month, out var year))
+        {
+            // Un número sin mes se toma como el N° interno de la salida.
+            return long.TryParse(noteNumber.Trim(), out var issueId) ? issueId : null;
+        }
+
+        var query = _unitOfWork.Repository<Issue>().Query()
+            .Where(i => i.MonthlyNumber == number && i.IssueDate.Month == month);
+        if (year.HasValue)
+        {
+            query = query.Where(i => i.IssueDate.Year == year.Value);
+        }
+
+        return await query
+            .OrderByDescending(i => i.IssueDate)
+            .Select(i => (long?)i.IssueId)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<ResponseGetObject> GetIssueSummary(long issueId)
+    {
+        var issue = await _unitOfWork.Repository<Issue>().GetByIdAsync(issueId);
+        if (issue is null)
+        {
+            return new ResponseGetObject
+            {
+                Data = new(),
+                Messages = [new Message { Type = MessageType.Error, Description = "No se encontró la salida." }],
+                StatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        string? clientName = null;
+        if (issue.ClientId.HasValue)
+        {
+            clientName = await (
+                from c in _unitOfWork.Repository<Client>().Query()
+                join p in _unitOfWork.Repository<Party>().Query() on c.PartyId equals p.PartyId
+                where c.ClientId == issue.ClientId.Value
+                select p.Name).FirstOrDefaultAsync();
+        }
+        var issueTypeName = issue.IssueTypeId.HasValue
+            ? (await _unitOfWork.Repository<IssueType>().GetByIdAsync(issue.IssueTypeId.Value))?.Name
+            : null;
+        var warehouseName = issue.WarehouseId.HasValue
+            ? (await _unitOfWork.Repository<Warehouse>().GetByIdAsync(issue.WarehouseId.Value))?.Name
+            : null;
+        var creator = issue.CreatedById.HasValue
+            ? await _unitOfWork.Repository<AppUser>().GetByIdAsync(issue.CreatedById.Value)
+            : null;
+
+        var lines = await (
+            from d in _unitOfWork.Repository<IssueDetail>().Query()
+            join p in _unitOfWork.Repository<Product>().Query() on d.ProductId equals p.ProductId
+            join m in _unitOfWork.Repository<MediaType>().Query() on p.MediaTypeId equals m.MediaTypeId into media
+            from m in media.DefaultIfEmpty()
+            join i in _unitOfWork.Repository<ProductImage>().Query() on p.ProductId equals i.ProductId into images
+            from i in images.DefaultIfEmpty()
+            where d.IssueId == issueId
+            orderby d.IssueDetailId
+            select new ReceiptSummaryLineDto
+            {
+                ProductId = p.ProductId,
+                Code = p.Code,
+                Name = p.Name,
+                UnitMeasure = m != null ? m.Name : null,
+                Quantity = d.Quantity,
+                UnitPrice = d.UnitCost,
+                UnitCost = d.UnitCost,
+                TotalCost = d.TotalCost,
+                ImageVersion = i != null ? i.UpdatedAt.Ticks : null
+            }).ToListAsync();
+
+        return new ResponseGetObject
+        {
+            Data = new IssueSummaryDto
+            {
+                IssueId = issue.IssueId,
+                NoteNumber = IssueNumbering.Format(issue.MonthlyNumber, issue.IssueDate, issue.IssueId),
+                IssueTypeId = issue.IssueTypeId,
+                IssueTypeName = issueTypeName,
+                ClientId = issue.ClientId,
+                ClientName = clientName,
+                WarehouseId = issue.WarehouseId,
+                WarehouseName = warehouseName,
+                IssueDate = issue.IssueDate,
+                Description = issue.Description,
+                IsVoided = issue.IsVoided,
+                CreatedByName = creator is null ? null : $"{creator.FirstName} {creator.LastName}".Trim(),
+                CreatedAt = issue.CreatedAt,
+                Lines = lines
             },
             Messages = [],
             StatusCode = HttpStatusCode.OK
@@ -164,18 +287,20 @@ public class IssueService : IIssueService
             errors.Add(new Message { Type = MessageType.Error, Description = "El tipo de salida seleccionado no existe." });
         }
 
-        if (issueRequestDto.WarehousePeriodId.HasValue)
+        // Como en Entradas: no se elige el período; la fecha de la salida es del mes anterior o del
+        // actual, hasta hoy, y el período es el de ese mes.
+        var issueDate = issueRequestDto.IssueDate?.Date ?? BoliviaTime.Today;
+        WarehousePeriod? warehousePeriod = null;
+        if (!MovementDates.IsWithinEntryWindow(issueDate))
         {
-            var warehousePeriod = await _unitOfWork.Repository<WarehousePeriod>().Query()
-                .FirstOrDefaultAsync(w => w.WarehousePeriodId == issueRequestDto.WarehousePeriodId.Value);
-
-            if (warehousePeriod is null)
+            errors.Add(new Message { Type = MessageType.Error, Description = MovementDates.EntryWindowMessage("fecha de la salida") });
+        }
+        else
+        {
+            warehousePeriod = await MovementDates.GetOrCreatePeriodAsync(_unitOfWork, issueDate);
+            if (warehousePeriod.IsClosed)
             {
-                errors.Add(new Message { Type = MessageType.Error, Description = "El período de almacén seleccionado no existe." });
-            }
-            else if (warehousePeriod.IsClosed)
-            {
-                errors.Add(new Message { Type = MessageType.Error, Description = "Este período de almacén está cerrado y ya no admite nuevos movimientos." });
+                errors.Add(new Message { Type = MessageType.Error, Description = $"El período {warehousePeriod.Name} está cerrado y ya no admite nuevos movimientos." });
             }
         }
 
@@ -230,7 +355,7 @@ public class IssueService : IIssueService
                 {
                     Type = MessageType.Error,
                     Description = reserved > 0
-                        ? $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}. Hay {reserved} unidades apartadas por una anulación de entrada pendiente de aprobación."
+                        ? $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}. Hay {reserved} unidades apartadas por una anulación o corrección de entrada pendiente de aprobación."
                         : $"Stock insuficiente de \"{product?.Name ?? $"#{productId}"}\": disponible {available}, solicitado {requested}."
                 });
                 continue;
@@ -253,18 +378,29 @@ public class IssueService : IIssueService
         {
             IssueTypeId = issueRequestDto.IssueTypeId,
             WarehouseId = issueRequestDto.WarehouseId,
-            WarehousePeriodId = issueRequestDto.WarehousePeriodId,
+            WarehousePeriodId = warehousePeriod!.WarehousePeriodId,
             ClientId = issueRequestDto.ClientId,
             Complement = issueRequestDto.Complement,
-            IssueDate = issueRequestDto.IssueDate?.Date ?? BoliviaTime.Today,
+            IssueDate = issueDate,
             PrintTypeId = issueRequestDto.PrintTypeId,
             Description = issueRequestDto.Description,
             CreatedAt = DateTime.UtcNow,
             CreatedById = _currentUserService.AppUserId
         };
 
-        await _unitOfWork.Repository<Issue>().AddAsync(issue);
-        await _unitOfWork.SaveChangesAsync();
+        // Se guarda con el siguiente N° de salida de su mes.
+        await IssueNumbering.Lock.WaitAsync();
+        try
+        {
+            issue.MonthlyNumber = await IssueNumbering.NextAsync(_unitOfWork, issue.IssueDate);
+            await _unitOfWork.Repository<Issue>().AddAsync(issue);
+            await _unitOfWork.SaveChangesAsync();
+        }
+        finally
+        {
+            IssueNumbering.Lock.Release();
+        }
+        await DocumentReviews.RecordEnteredAsync(_unitOfWork, DocumentReviews.Issue, issue.IssueId, issue.CreatedById);
 
         var stockRepository = _unitOfWork.Repository<Stock>();
 

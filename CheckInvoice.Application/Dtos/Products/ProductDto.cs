@@ -9,4 +9,7 @@ public class ProductDto
     public long? SubDepartmentId { get; set; }
     public long? MediaTypeId { get; set; }
     public bool IsActive { get; set; }
+    // Solo de lectura: si tiene foto y una versión para que el navegador no muestre una foto vieja.
+    public bool HasImage { get; set; }
+    public long? ImageVersion { get; set; }
 }

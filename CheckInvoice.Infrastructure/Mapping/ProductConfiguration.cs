@@ -35,5 +35,20 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         entity.Property(e => e.IsActive)
               .HasColumnName("is_active");
+
+        entity.Property(e => e.FundCode)
+              .IsRequired()
+              .HasMaxLength(10)
+              .HasColumnName("fund_code");
+
+        entity.Property(e => e.FunctionCode)
+              .IsRequired()
+              .HasMaxLength(10)
+              .HasColumnName("function_code");
+
+        entity.Property(e => e.RestrictionCode)
+              .IsRequired()
+              .HasMaxLength(10)
+              .HasColumnName("restriction_code");
     }
 }

@@ -13,4 +13,9 @@ public class Transfer
     public bool IsApproved { get; set; } = true;
     public long? ApprovedById { get; set; }
     public DateTime? ApprovedAt { get; set; }
+    // Anulada con autorización del Contador: los productos volvieron al almacén de origen.
+    public bool IsVoided { get; set; }
+    // Revisión: "digitado" -> "verificado" -> "aprobado"; reabrir vuelve a "digitado" y sube la versión.
+    public string ReviewStatus { get; set; } = "digitado";
+    public int ReviewVersion { get; set; } = 1;
 }

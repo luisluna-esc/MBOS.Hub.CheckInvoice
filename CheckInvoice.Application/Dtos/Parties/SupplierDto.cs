@@ -17,6 +17,9 @@ public class SupplierDto
     public string? Email { get; set; }
     public string? Notes { get; set; }
     public bool IsActive { get; set; }
+    /// <summary>Proveedor adventista: distrito e iglesia (null si no lo es).</summary>
+    public long? DistrictId { get; set; }
+    public long? ChurchId { get; set; }
     /// <summary>Solo de lectura: si esta misma identidad ya está registrada como Cliente.</summary>
     public long? LinkedClientId { get; set; }
     public string? LinkedClientName { get; set; }

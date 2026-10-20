@@ -88,6 +88,7 @@ public class DepartmentService : IDepartmentService
         var department = new Department
         {
             Name = departmentDto.Name,
+            Code = NormalizeCode(departmentDto.Code),
             IsActive = departmentDto.IsActive
         };
 
@@ -131,6 +132,7 @@ public class DepartmentService : IDepartmentService
         }
 
         department.Name = departmentDto.Name;
+        department.Code = NormalizeCode(departmentDto.Code);
         department.IsActive = departmentDto.IsActive;
 
         repository.Update(department);
@@ -174,6 +176,9 @@ public class DepartmentService : IDepartmentService
     {
         DepartmentId = department.DepartmentId,
         Name = department.Name,
+        Code = department.Code,
         IsActive = department.IsActive
     };
+
+    private static string? NormalizeCode(string? code) => string.IsNullOrWhiteSpace(code) ? null : code.Trim();
 }

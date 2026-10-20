@@ -50,5 +50,20 @@ public class TransferConfiguration : IEntityTypeConfiguration<Transfer>
         entity.Property(e => e.ApprovedAt)
               .HasColumnName("approved_at")
               .HasColumnType("timestamp without time zone");
+        entity.Property(e => e.IsVoided)
+              .IsRequired()
+              .HasColumnName("is_voided")
+              .HasDefaultValue(false);
+
+        entity.Property(e => e.ReviewStatus)
+              .IsRequired()
+              .HasMaxLength(20)
+              .HasColumnName("review_status")
+              .HasDefaultValue("digitado");
+
+        entity.Property(e => e.ReviewVersion)
+              .IsRequired()
+              .HasColumnName("review_version")
+              .HasDefaultValue(1);
     }
 }

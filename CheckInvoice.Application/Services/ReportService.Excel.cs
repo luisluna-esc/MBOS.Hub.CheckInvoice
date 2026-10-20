@@ -17,6 +17,7 @@ namespace CheckInvoice.Application.Services;
 public partial class ReportService
 {
     private const string MoneyFormat = "#,##0.00";
+    private const string QuantityFormat = "#,##0";
     private const string DateFormat = "dd/mm/yyyy";
     private const string IdFormat = "00000";
 
@@ -71,14 +72,14 @@ public partial class ReportService
             new("Subdepartamento", r => r.SubDepartmentName ?? "(Sin subcategoría)"),
             new("Código", r => r.Code),
             new("Descripción", r => r.Name),
-            new("Saldo inicial cant.", r => r.OpeningQuantity, MoneyFormat, Total: true),
-            new("Saldo inicial valor", r => r.OpeningValue, MoneyFormat, Total: true),
-            new("Entradas cant.", r => r.ReceiptsQuantity, MoneyFormat, Total: true),
-            new("Entradas valor", r => r.ReceiptsValue, MoneyFormat, Total: true),
-            new("Salidas cant.", r => r.IssuesQuantity, MoneyFormat, Total: true),
-            new("Salidas valor", r => r.IssuesValue, MoneyFormat, Total: true),
-            new("Saldo cant.", r => r.ClosingQuantity, MoneyFormat, Total: true),
-            new("Saldo valor", r => r.ClosingValue, MoneyFormat, Total: true)
+            new("Saldo inicial cant.", r => r.OpeningQuantity, QuantityFormat, Total: true),
+            new("Saldo inicial costo", r => r.OpeningValue, MoneyFormat, Total: true),
+            new("Entradas cant.", r => r.ReceiptsQuantity, QuantityFormat, Total: true),
+            new("Entradas costo", r => r.ReceiptsValue, MoneyFormat, Total: true),
+            new("Salidas cant.", r => r.IssuesQuantity, QuantityFormat, Total: true),
+            new("Salidas costo", r => r.IssuesValue, MoneyFormat, Total: true),
+            new("Saldo cant.", r => r.ClosingQuantity, QuantityFormat, Total: true),
+            new("Saldo costo", r => r.ClosingValue, MoneyFormat, Total: true)
         };
         return await BuildWorkbookAsync(wb => AddSheet(wb, "Kardex", "KARDEX FÍSICO VALORADO", info, columns, rows));
     }
@@ -98,11 +99,11 @@ public partial class ReportService
             new("Código", r => r.Code),
             new("Descripción", r => r.Name),
             new("Unidad de medida", r => r.UnitMeasure),
-            new("Cantidad", r => r.Quantity, MoneyFormat, Total: true),
-            new("Valor unitario", r => r.UnitValue ?? 0, MoneyFormat),
-            new("Valor total", r => r.TotalValue, MoneyFormat, Total: true),
-            new("Cantidad física", r => r.PhysicalQuantity ?? 0, MoneyFormat, Total: true),
-            new("Diferencia", r => r.Difference ?? 0, MoneyFormat, Total: true)
+            new("Cantidad", r => r.Quantity, QuantityFormat, Total: true),
+            new("Costo unitario", r => r.UnitValue ?? 0, MoneyFormat),
+            new("Costo total", r => r.TotalValue, MoneyFormat, Total: true),
+            new("Cantidad física", r => r.PhysicalQuantity ?? 0, QuantityFormat, Total: true),
+            new("Diferencia", r => r.Difference ?? 0, QuantityFormat, Total: true)
         };
         return await BuildWorkbookAsync(wb => AddSheet(wb, "Levantamiento", "LEVANTAMIENTO DE INVENTARIO", info, columns, rows));
     }
@@ -118,15 +119,15 @@ public partial class ReportService
         };
         var columns = new List<ExcelColumn<IssuesReportRowDto>>
         {
-            new("N° Salida", r => r.IssueId, IdFormat),
+            new("N° Salida", r => IssueNo(r.IssueId)),
             new("Departamento", r => r.DepartmentName ?? "(Sin categoría)"),
             new("Subdepartamento", r => r.SubDepartmentName ?? "(Sin subcategoría)"),
             new("Código", r => r.Code),
             new("Descripción", r => r.Name),
             new("Unidad de medida", r => r.UnitMeasure),
-            new("Cantidad", r => r.Quantity, MoneyFormat, Total: true),
-            new("Valor unitario", r => r.UnitCost, MoneyFormat),
-            new("Valor total", r => r.TotalCost, MoneyFormat, Total: true)
+            new("Cantidad", r => r.Quantity, QuantityFormat, Total: true),
+            new("Costo unitario", r => r.UnitCost, MoneyFormat),
+            new("Costo total", r => r.TotalCost, MoneyFormat, Total: true)
         };
         return await BuildWorkbookAsync(wb => AddSheet(wb, "Salidas", "SALIDAS DE ALMACÉN", info, columns, rows));
     }
@@ -135,6 +136,7 @@ public partial class ReportService
     {
         var rows = (await GetReceiptsReport(filter))
             .OrderBy(r => r.DepartmentName).ThenBy(r => r.SubDepartmentName).ThenBy(r => r.Name).ThenBy(r => r.ReceiptId).ToList();
+        var noteNumbers = await ReceiptNoteNumbersAsync(rows.Select(r => r.ReceiptId));
         var info = new List<string>
         {
             $"Almacén: {await WarehouseNameAsync(filter.WarehouseId)}",
@@ -142,16 +144,16 @@ public partial class ReportService
         };
         var columns = new List<ExcelColumn<ReceiptsReportRowDto>>
         {
-            new("N° Ingreso", r => r.ReceiptId, IdFormat),
+            new("N° Nota", r => noteNumbers.GetValueOrDefault(r.ReceiptId, r.ReceiptId.ToString())),
             new("Fecha", r => r.ReceiptDate.Date, DateFormat),
             new("Departamento", r => r.DepartmentName ?? "(Sin categoría)"),
             new("Subdepartamento", r => r.SubDepartmentName ?? "(Sin subcategoría)"),
             new("Código", r => r.Code),
             new("Descripción", r => r.Name),
             new("Unidad de medida", r => r.UnitMeasure),
-            new("Cantidad", r => r.Quantity, MoneyFormat, Total: true),
-            new("Valor unitario", r => r.UnitCost, MoneyFormat),
-            new("Valor total", r => r.TotalCost, MoneyFormat, Total: true)
+            new("Cantidad", r => r.Quantity, QuantityFormat, Total: true),
+            new("Costo unitario", r => r.UnitCost, MoneyFormat),
+            new("Costo total", r => r.TotalCost, MoneyFormat, Total: true)
         };
         return await BuildWorkbookAsync(wb => AddSheet(wb, "Ingresos", "INGRESOS DE ALMACÉN", info, columns, rows));
     }
@@ -165,6 +167,7 @@ public partial class ReportService
     public async Task<byte[]> GenerateKardexByProductReportExcel(KardexByProductReportQueryFilter filter)
     {
         var rows = await GetKardexByProductReport(filter);
+        var noteNumbers = await ReceiptNoteNumbersAsync(rows.Where(r => r.MovementType == "receipt").Select(r => r.VoucherId));
         var opening = await GetKardexByProductOpeningBalance(filter.ProductId, filter.WarehouseId, filter.DateFrom);
 
         var product = await _unitOfWork.Repository<Product>().GetByIdAsync(filter.ProductId);
@@ -182,7 +185,7 @@ public partial class ReportService
             var isReceipt = row.MovementType == "receipt";
             movements.Add(new KardexMovementExcelRow(
                 row.VoucherDate.Date,
-                row.VoucherId.ToString().PadLeft(5, '0'),
+                isReceipt ? noteNumbers.GetValueOrDefault(row.VoucherId, row.VoucherId.ToString()) : row.VoucherId.ToString().PadLeft(5, '0'),
                 isReceipt ? "Ingreso" : "Salida",
                 isReceipt ? row.Quantity : null, isReceipt ? row.UnitCost : null, isReceipt ? row.TotalCost : null,
                 isReceipt ? null : row.Quantity, isReceipt ? null : row.UnitCost, isReceipt ? null : row.TotalCost,
@@ -202,14 +205,14 @@ public partial class ReportService
             new("Fecha", r => r.Date, DateFormat),
             new("N° Comprobante", r => r.Voucher),
             new("Tipo", r => r.Type),
-            new("Ingresos cant.", r => r.InQuantity, MoneyFormat, Total: true),
-            new("Ingresos valor unit.", r => r.InUnitCost, MoneyFormat),
+            new("Ingresos cant.", r => r.InQuantity, QuantityFormat, Total: true),
+            new("Ingresos costo unit.", r => r.InUnitCost, MoneyFormat),
             new("Ingresos total", r => r.InTotal, MoneyFormat, Total: true),
-            new("Salidas cant.", r => r.OutQuantity, MoneyFormat, Total: true),
-            new("Salidas valor unit.", r => r.OutUnitCost, MoneyFormat),
+            new("Salidas cant.", r => r.OutQuantity, QuantityFormat, Total: true),
+            new("Salidas costo unit.", r => r.OutUnitCost, MoneyFormat),
             new("Salidas total", r => r.OutTotal, MoneyFormat, Total: true),
-            new("Saldo cant.", r => r.BalanceQuantity, MoneyFormat),
-            new("Saldo valor unit.", r => r.BalanceUnitValue, MoneyFormat),
+            new("Saldo cant.", r => r.BalanceQuantity, QuantityFormat),
+            new("Saldo costo unit.", r => r.BalanceUnitValue, MoneyFormat),
             new("Saldo total", r => r.BalanceValue, MoneyFormat)
         };
         return await BuildWorkbookAsync(wb => AddSheet(wb, "Kardex por material", "KARDEX POR MATERIAL", info, columns, movements));
@@ -229,7 +232,7 @@ public partial class ReportService
         };
         var receivableColumns = new List<ExcelColumn<PastorFieldReceivableRowDto>>
         {
-            new("N° Salida", r => r.IssueId, IdFormat),
+            new("N° Salida", r => IssueNo(r.IssueId)),
             new("Fecha", r => r.IssueDate?.Date, DateFormat),
             new("Fecha límite", r => r.DueDate?.ToDateTime(TimeOnly.MinValue), DateFormat),
             new("Saldo pendiente", r => r.OutstandingBalance, MoneyFormat, Total: true),
@@ -237,7 +240,7 @@ public partial class ReportService
         };
         var deliveryColumns = new List<ExcelColumn<PastorFieldDeliveryRowDto>>
         {
-            new("N° Salida", r => r.IssueId, IdFormat),
+            new("N° Salida", r => IssueNo(r.IssueId)),
             new("Fecha", r => r.IssueDate.Date, DateFormat),
             new("Total", r => r.Total, MoneyFormat, Total: true)
         };
@@ -245,7 +248,7 @@ public partial class ReportService
         {
             // Momento exacto del pago (UTC) pasado a la hora de Bolivia.
             new("Fecha", r => BoliviaTime.FromUtc(r.PaymentDate).Date, DateFormat),
-            new("N° Salida", r => r.IssueId, IdFormat),
+            new("N° Salida", r => IssueNo(r.IssueId)),
             new("Monto", r => r.Amount, MoneyFormat, Total: true),
             new("Método", r => PaymentMethodLabel(r.PaymentMethod)),
             new("Notas", r => r.Notes)
@@ -286,7 +289,7 @@ public partial class ReportService
         var columns = new List<ExcelColumn<ReceivableProductRow>>
         {
             new("Cliente", r => r.Account.ClientName ?? "(Sin cliente)"),
-            new("N° Salida", r => r.Account.IssueId, IdFormat),
+            new("N° Salida", r => IssueNo(r.Account.IssueId)),
             new("Fecha", r => r.Account.IssueDate?.Date, DateFormat),
             new("Fecha límite", r => r.Account.DueDate?.ToDateTime(TimeOnly.MinValue), DateFormat)
         };
@@ -295,9 +298,9 @@ public partial class ReportService
             new("Código", r => r.Code),
             new("Descripción", r => r.Name),
             new("Unidad de medida", r => r.UnitMeasure),
-            new("Cantidad", r => r.Quantity, MoneyFormat, Total: true),
-            new("Valor unitario", r => r.UnitCost, MoneyFormat),
-            new("Valor total", r => r.TotalCost, MoneyFormat, Total: true),
+            new("Cantidad", r => r.Quantity, QuantityFormat, Total: true),
+            new("Costo unitario", r => r.UnitCost, MoneyFormat),
+            new("Costo total", r => r.TotalCost, MoneyFormat, Total: true),
             new("Pagado", r => r.Paid, MoneyFormat, Total: true),
             new("Saldo", r => r.Balance, MoneyFormat, Total: true),
             new("Estado", r => AccountReceivableStatusLabel(r.Account.Status))
@@ -313,9 +316,9 @@ public partial class ReportService
         new("Código", r => r.Code),
         new("Descripción", r => r.Name),
         new("Unidad de medida", r => r.UnitMeasure),
-        new("Cantidad", r => r.NetQuantity, MoneyFormat),
-        new("Valor unitario", r => r.UnitValue, MoneyFormat),
-        new("Valor total", r => r.TotalValue, MoneyFormat, Total: true)
+        new("Cantidad", r => r.NetQuantity, QuantityFormat),
+        new("Costo unitario", r => r.UnitValue, MoneyFormat),
+        new("Costo total", r => r.TotalValue, MoneyFormat, Total: true)
     ];
 
     // ---------- Armado del libro ----------
@@ -328,6 +331,11 @@ public partial class ReportService
 
         using var workbook = new XLWorkbook();
         fill(workbook);
+        // Modo TXT (ver ReportService.Txt.cs): las hojas se escribieron como texto, no hay libro.
+        if (_txtSink is not null)
+        {
+            return [];
+        }
 
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
@@ -338,17 +346,23 @@ public partial class ReportService
         XLWorkbook workbook, string sheetName, string title, IReadOnlyList<string> info,
         IReadOnlyList<ExcelColumn<T>> columns, IReadOnlyList<T> rows)
     {
+        if (_txtSink is not null)
+        {
+            AddTxtSection(title, info, columns, rows);
+            return;
+        }
+
         var sheet = workbook.Worksheets.Add(sheetName);
         var columnCount = columns.Count;
         var widths = columns.Select(c => (double)c.Header.Length).ToArray();
 
         var headerLines = new List<string>
         {
-            "IGLESIA ADVENTISTA DEL SÉPTIMO DÍA — MISIÓN BOLIVIANA OCCIDENTAL DEL SUR — LA PAZ - BOLIVIA",
-            title
+            $"{InstitutionName} · {InstitutionDetail}",
+            ReportTitleCase(title)
         };
         headerLines.AddRange(info);
-        headerLines.Add("(Expresado en Bolivianos)");
+        headerLines.Add("Expresado en bolivianos (Bs.)");
         headerLines.Add($"Generado el {BoliviaTime.Now:dd/MM/yyyy HH:mm} por {_excelUsername}");
 
         var rowIndex = 1;
@@ -357,10 +371,19 @@ public partial class ReportService
             var cell = sheet.Cell(rowIndex, 1);
             cell.Value = line;
             sheet.Range(rowIndex, 1, rowIndex, columnCount).Merge();
-            if (rowIndex <= 2)
+            // Mismos colores que los PDF (ReportService.Theme.cs): título en el azul del sistema,
+            // el resto de las líneas del encabezado en gris suave.
+            if (rowIndex == 2)
             {
                 cell.Style.Font.Bold = true;
-                cell.Style.Font.FontSize = rowIndex == 2 ? 14 : 11;
+                cell.Style.Font.FontSize = 15;
+                cell.Style.Font.FontColor = XLColor.FromHtml(ReportAccent);
+            }
+            else
+            {
+                cell.Style.Font.FontSize = rowIndex == 1 ? 10 : 9;
+                cell.Style.Font.Bold = rowIndex == 1;
+                cell.Style.Font.FontColor = XLColor.FromHtml(rowIndex == 1 ? ReportAccent : ReportMuted);
             }
             rowIndex++;
         }
@@ -372,8 +395,10 @@ public partial class ReportService
             var cell = sheet.Cell(headerRow, c + 1);
             cell.Value = columns[c].Header;
             cell.Style.Font.Bold = true;
-            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#D9D9D9");
-            cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            cell.Style.Font.FontColor = XLColor.FromHtml(ReportAccent);
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml(ReportHeaderFill);
+            cell.Style.Border.BottomBorder = XLBorderStyleValues.Medium;
+            cell.Style.Border.BottomBorderColor = XLColor.FromHtml(ReportLineStrong);
             cell.Style.Alignment.WrapText = true;
             cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
         }
@@ -395,6 +420,13 @@ public partial class ReportService
             }
         }
         var lastDataRow = rowIndex;
+        if (lastDataRow >= firstDataRow)
+        {
+            var dataRange = sheet.Range(firstDataRow, 1, lastDataRow, columnCount);
+            dataRange.Style.Font.FontColor = XLColor.FromHtml(ReportInk);
+            dataRange.Style.Border.BottomBorder = XLBorderStyleValues.Hair;
+            dataRange.Style.Border.BottomBorderColor = XLColor.FromHtml(ReportLine);
+        }
 
         if (columns.Any(c => c.Total || c.FixedTotal.HasValue))
         {
@@ -428,8 +460,10 @@ public partial class ReportService
 
             var totalRange = sheet.Range(rowIndex, 1, rowIndex, columnCount);
             totalRange.Style.Font.Bold = true;
-            totalRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#EDEDED");
-            totalRange.Style.Border.TopBorder = XLBorderStyleValues.Thin;
+            totalRange.Style.Font.FontColor = XLColor.FromHtml(ReportAccent);
+            totalRange.Style.Fill.BackgroundColor = XLColor.FromHtml(ReportTotalFill);
+            totalRange.Style.Border.BottomBorder = XLBorderStyleValues.Medium;
+            totalRange.Style.Border.BottomBorderColor = XLColor.FromHtml(ReportAccent);
         }
 
         if (lastDataRow >= firstDataRow)

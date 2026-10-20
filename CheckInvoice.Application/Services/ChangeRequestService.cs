@@ -155,6 +155,23 @@ public class ChangeRequestService : IChangeRequestService
             };
         }
 
+        var reviewStatus = entity switch
+        {
+            Receipt receipt => receipt.ReviewStatus,
+            Issue issue => issue.ReviewStatus,
+            Transfer transfer => transfer.ReviewStatus,
+            _ => null
+        };
+        if (reviewStatus == DocumentReviews.Approved)
+        {
+            return new ResponsePost
+            {
+                Id = 0,
+                Messages = [new Message { Type = MessageType.Error, Description = "El documento está aprobado. Pide al Contador que lo reabra antes de corregirlo." }],
+                StatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
         var currentDataJson = JsonSerializer.Serialize(entity, entity.GetType());
         string? proposedDataJson = null;
 

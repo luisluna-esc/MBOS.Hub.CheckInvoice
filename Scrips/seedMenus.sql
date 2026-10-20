@@ -21,7 +21,7 @@ INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_or
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Catálogos', 'nav.catalogs', NULL, 'catalog', NULL, 4, TRUE, NULL)
+('Catálogos', 'nav.catalogs', NULL, 'catalog', NULL, 9, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -53,7 +53,7 @@ WHERE m.name = 'Catálogos' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Transferencias', 'nav.transfers', NULL, 'transfer', NULL, 5, TRUE, NULL)
+('Transferencias', 'nav.transfers', NULL, 'transfer', NULL, 4, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -69,13 +69,13 @@ WHERE m.name = 'Transferencias' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Recibidas', 'nav.transfersReceived', '/transfers/received', NULL, m.menu_id, 3, TRUE, NULL
+SELECT 'Recibidas', 'nav.transfersReceived', '/transfers/received', NULL, m.menu_id, 3, FALSE, NULL
 FROM menu m
 WHERE m.name = 'Transferencias' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Geografía', 'nav.geography', NULL, 'district', NULL, 6, TRUE, NULL)
+('Geografía', 'nav.geography', NULL, 'district', NULL, 10, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -91,7 +91,7 @@ WHERE m.name = 'Geografía' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Administración', 'nav.admin', NULL, 'admin', NULL, 7, TRUE, NULL)
+('Administración', 'nav.admin', NULL, 'admin', NULL, 12, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -112,37 +112,80 @@ FROM menu m
 WHERE m.name = 'Administración' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
+-- Autorizaciones: las anulaciones de Salidas y de Entradas juntas.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Anulaciones', 'nav.issueVoidRequests', '/issues/void-requests', 'void', NULL, 8, TRUE, NULL)
+('Autorizaciones', 'nav.authorizations', NULL, 'void', NULL, 6, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Anulaciones de Entradas', 'nav.receiptVoidRequests', '/receipts/void-requests', 'void', NULL, 12, TRUE, NULL)
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Anulaciones', 'nav.issueVoidRequests', '/issues/void-requests', NULL, m.menu_id, 1, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Autorizaciones' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Anulaciones de Entradas', 'nav.receiptVoidRequests', '/receipts/void-requests', NULL, m.menu_id, 2, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Autorizaciones' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
+
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Anulaciones de Transferencias', 'nav.transferVoidRequests', '/transfers/void-requests', NULL, m.menu_id, 3, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Autorizaciones' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
+
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Correcciones de Entradas', 'nav.receiptEditRequests', '/receipts/edit-requests', NULL, m.menu_id, 4, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Autorizaciones' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
+
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Correcciones de Salidas', 'nav.issueEditRequests', '/issues/edit-requests', NULL, m.menu_id, 5, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Autorizaciones' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
+
+-- Ajuste de Inventario y Devoluciones quedan inactivos en el menú: se abren desde Entradas.
 -- Ajuste de Inventario: corrección libre de stock (ej. conteo físico), sin referenciar
 -- ninguna Entrada/Salida existente. Internamente crea una Entrada tipo "Ajuste" o una Salida
 -- tipo "Salida por Merma" según el signo de la diferencia, así queda dentro del mismo Kardex.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Ajuste de Inventario', 'nav.stockAdjustment', '/stock-adjustments', 'adjustment', NULL, 14, TRUE, NULL)
+('Ajuste de Inventario', 'nav.stockAdjustment', '/stock-adjustments', 'adjustment', NULL, 14, FALSE, NULL)
 ON CONFLICT DO NOTHING;
 
 -- Devoluciones: apartado propio (no una acción dentro de Salidas). Se elige la Salida original
 -- y se registra el retorno como Entrada tipo "Devolucion" referenciando esa Salida.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Devoluciones', 'nav.issueReturns', '/issue-returns', 'return', NULL, 15, TRUE, NULL)
+('Devoluciones', 'nav.issueReturns', '/issue-returns', 'return', NULL, 15, FALSE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Cuentas por Cobrar', 'nav.accountReceivables', '/account-receivables', 'receivable', NULL, 9, TRUE, NULL)
+('Cuentas por Cobrar', 'nav.accountReceivables', '/account-receivables', 'receivable', NULL, 7, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Mi Cuenta', 'nav.myAccount', '/portal/my-account', 'portal', NULL, 10, TRUE, NULL)
+('Mi Cuenta', 'nav.myAccount', '/portal/my-account', 'portal', NULL, 8, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Reportes', 'nav.reports', NULL, 'report', NULL, 11, TRUE, NULL)
+('Reportes', 'nav.reports', NULL, 'report', NULL, 5, TRUE, NULL)
+ON CONFLICT DO NOTHING;
+
+-- Historial de Entradas: buscar una nota de ingreso y reimprimirla. Antes era la pantalla de
+-- Entradas; ahora Entradas solo pregunta el motivo (Compras, Transferencias, Devoluciones...).
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Historial de Entradas', 'nav.reportsReceiptHistory', '/reports/receipt-history', NULL, m.menu_id, 1, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
+
+-- Historial de Salidas: igual que el de Entradas; Salidas solo pregunta el tipo de salida.
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Historial de Salidas', 'nav.reportsIssueHistory', '/reports/issue-history', NULL, m.menu_id, 1, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -193,6 +236,24 @@ FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Transferencias de Almacén', 'nav.reportsTransfers', '/reports/transfers', NULL, m.menu_id, 11, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
+
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Salidas para Contabilidad', 'nav.reportsIssuesAccounting', '/reports/issues-accounting', NULL, m.menu_id, 12, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
+
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Ingresos para Contabilidad', 'nav.reportsReceiptsAccounting', '/reports/receipts-accounting', NULL, m.menu_id, 13, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
+
 -- Nombre distinto al de la pantalla de gestión "Cuentas por Cobrar" (movimientos) para que
 -- el filtro por nombre de menu_role no confunda ambos menús.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -207,7 +268,7 @@ ON CONFLICT DO NOTHING;
 -- Proveedores/Productos/Clientes) para no mezclar catálogos de negocio con catálogos de
 -- referencia/configuración del sistema.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Configuración del Sistema', 'nav.settings', NULL, 'settings', NULL, 13, TRUE, NULL)
+('Configuración del Sistema', 'nav.settings', NULL, 'settings', NULL, 11, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -296,6 +357,13 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
 SELECT 'Períodos de Almacén', 'nav.settingsWarehousePeriods', '/admin/lookup/warehouse-periods', NULL, m.menu_id, 15, TRUE, NULL
+FROM menu m
+WHERE m.name = 'Configuración del Sistema' AND m.parent_menu_id IS NULL
+ON CONFLICT DO NOTHING;
+
+-- Inventario inicial desde Excel (una sola vez por almacén).
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
+SELECT 'Inventario Inicial', 'nav.settingsInitialInventory', '/admin/initial-inventory', NULL, m.menu_id, 16, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Configuración del Sistema' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;

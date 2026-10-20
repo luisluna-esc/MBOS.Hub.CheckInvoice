@@ -6,6 +6,7 @@ public class ReceiptDetailDto
     public long ReceiptId { get; set; }
     public long ProductId { get; set; }
     public decimal Quantity { get; set; }
+    public decimal? UnitPrice { get; set; }
     public decimal UnitCost { get; set; }
     public decimal TotalCost { get; set; }
     public string? WorkOrder { get; set; }

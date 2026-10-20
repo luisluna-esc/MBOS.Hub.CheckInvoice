@@ -3,6 +3,8 @@ namespace CheckInvoice.Application.Dtos.Movements;
 public class IssueDto
 {
     public long IssueId { get; set; }
+    // N° de salida del mes ("S 15-01-26"); en salidas anteriores a la numeración, el N° interno.
+    public string? NoteNumber { get; set; }
     public long? IssueTypeId { get; set; }
     public long? WarehouseId { get; set; }
     public long? WarehousePeriodId { get; set; }
@@ -20,4 +22,6 @@ public class IssueDto
     public bool HasPendingVoidRequest { get; set; }
     public string? VoidReasonName { get; set; }
     public string? VoidDetail { get; set; }
+    // Revisión: digitado, verificado o aprobado.
+    public string? ReviewStatus { get; set; }
 }
