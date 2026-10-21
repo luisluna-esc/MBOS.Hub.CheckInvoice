@@ -79,7 +79,7 @@ STABLE
 AS $$
     WITH pending AS (
         SELECT 'toVerify'::varchar AS kind, 'receipt'::varchar AS document_type, r.receipt_id AS document_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') AS number,
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') AS number,
                rt.name::text AS detail, NULL::varchar AS status, r.created_at AS at
         FROM receipt r LEFT JOIN receipt_type rt ON rt.receipt_type_id = r.receipt_type_id
         WHERE p_can_verify AND NOT r.is_voided AND r.review_status = 'digitado'
@@ -96,7 +96,7 @@ AS $$
         WHERE p_can_verify AND NOT t.is_voided AND t.review_status = 'digitado'
         UNION ALL
         SELECT 'toApprove', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), rt.name::text, NULL, r.created_at
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), rt.name::text, NULL, r.created_at
         FROM receipt r LEFT JOIN receipt_type rt ON rt.receipt_type_id = r.receipt_type_id
         WHERE p_can_approve AND NOT r.is_voided AND r.review_status = 'verificado'
         UNION ALL
@@ -112,7 +112,7 @@ AS $$
         WHERE p_can_approve AND NOT t.is_voided AND t.review_status = 'verificado'
         UNION ALL
         SELECT 'voidRequest', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), v.detail::text, NULL, v.requested_at
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), v.detail::text, NULL, v.requested_at
         FROM receipt_void_request v JOIN receipt r ON r.receipt_id = v.receipt_id
         WHERE p_can_approve AND v.status = 'pending'
         UNION ALL
@@ -125,7 +125,7 @@ AS $$
         WHERE p_can_approve AND v.status = 'pending'
         UNION ALL
         SELECT 'receiptEdit', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.reason::text, NULL, c.requested_at
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.reason::text, NULL, c.requested_at
         FROM change_request c JOIN receipt r ON r.receipt_id = c.record_id
         WHERE p_can_approve AND c.table_name = 'receipt_edit' AND c.status = 'pending'
         UNION ALL
@@ -137,7 +137,7 @@ AS $$
     -- de sus documentos, aprobados o rechazados).
     notifications AS (
         SELECT 'voidRequest'::varchar AS kind, 'receipt'::varchar AS document_type, r.receipt_id AS document_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') AS number,
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') AS number,
                v.review_notes::text AS detail, v.status AS status, v.reviewed_at AS at,
                'receipt_void:' || v.receipt_void_request_id AS notification_key
         FROM receipt_void_request v JOIN receipt r ON r.receipt_id = v.receipt_id
@@ -154,7 +154,7 @@ AS $$
         WHERE v.requested_by = p_user_id AND v.status <> 'pending'
         UNION ALL
         SELECT 'receiptEdit', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.review_notes::text, c.status, c.reviewed_at,
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.review_notes::text, c.status, c.reviewed_at,
                'receipt_edit:' || c.change_request_id
         FROM change_request c JOIN receipt r ON r.receipt_id = c.record_id
         WHERE c.table_name = 'receipt_edit' AND c.requested_by = p_user_id AND c.status <> 'pending'
@@ -168,7 +168,7 @@ AS $$
         SELECT CASE WHEN d.action = 'aprobado' THEN 'reviewApproved' ELSE 'reviewRejected' END::varchar,
                d.document_type, d.document_id,
                CASE WHEN d.document_type = 'receipt'
-                    THEN (SELECT 'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') FROM receipt r WHERE r.receipt_id = d.document_id)
+                    THEN (SELECT 'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') FROM receipt r WHERE r.receipt_id = d.document_id)
                     WHEN d.document_type = 'issue' THEN fn_issue_number(d.document_id)
                     ELSE lpad(d.document_id::text, 5, '0') END,
                d.reason::text,
@@ -187,7 +187,7 @@ AS $$
     signed AS (
         SELECT 'reviewSigned'::varchar AS kind, d.document_type::varchar AS document_type, d.document_id AS document_id,
                CASE WHEN d.document_type = 'receipt'
-                    THEN (SELECT 'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') FROM receipt r WHERE r.receipt_id = d.document_id)
+                    THEN (SELECT 'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') FROM receipt r WHERE r.receipt_id = d.document_id)
                     WHEN d.document_type = 'issue' THEN fn_issue_number(d.document_id)
                     ELSE lpad(d.document_id::text, 5, '0') END AS number,
                d.reason::text AS detail, d.action::varchar AS status, d.at AS at
@@ -195,7 +195,7 @@ AS $$
         WHERE d.user_id = p_user_id AND d.action IN ('verificado', 'aprobado', 'rechazado', 'reabierto')
         UNION ALL
         SELECT 'voidRequest', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), v.review_notes::text, v.status, v.reviewed_at
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), v.review_notes::text, v.status, v.reviewed_at
         FROM receipt_void_request v JOIN receipt r ON r.receipt_id = v.receipt_id
         WHERE v.reviewed_by = p_user_id AND v.status <> 'pending'
         UNION ALL
@@ -208,7 +208,7 @@ AS $$
         WHERE v.reviewed_by = p_user_id AND v.status <> 'pending'
         UNION ALL
         SELECT 'receiptEdit', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.review_notes::text, c.status, c.reviewed_at
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.review_notes::text, c.status, c.reviewed_at
         FROM change_request c JOIN receipt r ON r.receipt_id = c.record_id
         WHERE c.table_name = 'receipt_edit' AND c.reviewed_by = p_user_id AND c.status <> 'pending'
         UNION ALL

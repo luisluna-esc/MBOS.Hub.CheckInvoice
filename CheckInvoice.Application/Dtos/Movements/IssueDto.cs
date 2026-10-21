@@ -24,4 +24,6 @@ public class IssueDto
     public string? VoidDetail { get; set; }
     // Revisión: digitado, verificado o aprobado.
     public string? ReviewStatus { get; set; }
+    /// <summary>Salida por lote: el lote al que pertenece (null si es una salida suelta).</summary>
+    public long? IssueBatchId { get; set; }
 }

@@ -76,6 +76,11 @@ public class ProductService : IProductService
             query = query.Where(p => stockQuery.Any(s =>
                 s.ProductId == p.ProductId && s.WarehouseId == warehouseId && s.Quantity > 0));
         }
+        else if (productQueryFilter.InStock == true)
+        {
+            var stockQuery = _unitOfWork.Repository<Stock>().Query();
+            query = query.Where(p => stockQuery.Any(s => s.ProductId == p.ProductId && s.Quantity > 0));
+        }
 
         var totalRecords = await query.CountAsync();
 

@@ -20,7 +20,7 @@ public class Product
 /// <summary>Valores fijos del formato de importación contable ("Transaction_Entry").</summary>
 public static class AccountingCodes
 {
-    public const string Account = "4121565";
+    public const string Account = "1146002";
     public const string Fund = "10";
     public const string Function = "0000";
     public const string Restriction = "0A";

@@ -8,6 +8,8 @@ public class PortalStatementAccountDto
 {
     public long AccountReceivableId { get; set; }
     public long? IssueId { get; set; }
+    /// <summary>N° de la salida como se imprime ("S 5-10-26").</summary>
+    public string? NoteNumber { get; set; }
     public DateTime? IssueDate { get; set; }
     public DateOnly? DueDate { get; set; }
     public string Status { get; set; } = string.Empty;

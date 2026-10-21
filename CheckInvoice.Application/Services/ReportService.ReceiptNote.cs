@@ -166,7 +166,7 @@ public partial class ReportService
         SignatureCaption(column, title, fontSize);
     }
 
-    // N° de nota de cada entrada ("MB 15-10-26"), para los reportes que listan entradas.
+    // N° de nota de cada entrada ("I 15-10-26"), para los reportes que listan entradas.
     private async Task<Dictionary<long, string>> ReceiptNoteNumbersAsync(IEnumerable<long> receiptIds)
     {
         var ids = receiptIds.Distinct().ToList();
@@ -237,7 +237,7 @@ public partial class ReportService
                     page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(7.5f));
 
                     page.Header().Element(c => HalfLetterHeader(c, $"Nota de Ingreso a Almacén · {ReportTitleCase(ReceiptTypeLabel(note.ReceiptTypeName))}",
-                        "NOTA DE INGRESO N°", note.NoteNumber, $"Reg. {receiptId:D5}", qr,
+                        "NOTA DE INGRESO N°", note.NoteNumber, null, qr,
                         [
                             [("Almacén", note.WarehouseName, 3f), ("Fecha de ingreso", receipt.IssueDate.ToString("dd/MM/yyyy"), 2f),
                                 ("Fecha de compra", receipt.PurchaseDate?.ToString("dd/MM/yyyy") ?? "—", 2f)],
@@ -319,6 +319,13 @@ public partial class ReportService
                             {
                                 mainColumn.Item().PaddingTop(3).AlignRight()
                                     .Text($"Valor total de la compra: {receipt.InvoiceTotal.Value.ToString("N2", ReportCulture)} Bs.").FontSize(7);
+                                if (isRetention)
+                                {
+                                    // Con retención el 100% de la compra es el valor total dividido entre 0,92.
+                                    var retentionBase = Math.Round(receipt.InvoiceTotal.Value / ReceiptCosting.RetentionCostFactor, 2, MidpointRounding.AwayFromZero);
+                                    mainColumn.Item().AlignRight()
+                                        .Text($"100% con retención (÷ 0,92): {retentionBase.ToString("N2", ReportCulture)} Bs.").FontSize(7);
+                                }
                             }
 
                             mainColumn.Item().PaddingTop(10).Row(row =>

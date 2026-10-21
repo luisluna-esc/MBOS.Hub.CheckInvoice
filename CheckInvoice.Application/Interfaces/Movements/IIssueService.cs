@@ -11,4 +11,5 @@ public interface IIssueService
     Task<ResponseGetObject> GetIssueDetails(long issueId);
     Task<ResponseGetObject> GetIssueSummary(long issueId);
     Task<ResponsePost> InsertIssue(IssueRequestDto issueRequestDto);
+    Task<ResponsePost> InsertIssueBatch(IssueBatchRequestDto request);
 }

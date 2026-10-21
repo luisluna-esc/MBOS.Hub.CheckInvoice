@@ -153,7 +153,7 @@ public partial class ReportService
         return lines.Select(line =>
         {
             var note = ReceiptNumbering.Format(line.MonthlyNumber, line.IssueDate, line.ReceiptId);
-            // Como en salidas ("S-3650 - 58 Uds. Producto"), con el N° de nota y, si la hay, la factura.
+            // Sin el N° de nota (va en su propia columna): la factura, si la hay, y "58 Uds. Producto".
             var invoice = string.IsNullOrWhiteSpace(line.InvoiceNumber) || line.InvoiceNumber.Trim() == "0"
                 ? string.Empty
                 : $"Fact. {line.InvoiceNumber.Trim()} - ";
@@ -166,7 +166,7 @@ public partial class ReportService
                 RestrictionCode = line.RestrictionCode,
                 EntityValue = Math.Round(line.TotalCost, 2, MidpointRounding.AwayFromZero),
                 SendMemo = AccountingCodes.SendMemo,
-                Description = $"{note} - {invoice}{AccountingQuantity(line.Quantity)} Uds. {line.ProductName}",
+                Description = $"{invoice}{AccountingQuantity(line.Quantity)} Uds. {line.ProductName}",
                 DocumentId = line.ReceiptId,
                 DocumentDate = DateTime.SpecifyKind(line.IssueDate, DateTimeKind.Unspecified),
                 DocumentNumber = note,

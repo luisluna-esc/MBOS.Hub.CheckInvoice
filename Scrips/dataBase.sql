@@ -424,13 +424,26 @@ CREATE TABLE receipt (
     CONSTRAINT fk_receipt_receipt_type FOREIGN KEY (receipt_type_id) REFERENCES receipt_type(receipt_type_id),
     CONSTRAINT fk_receipt_created_by FOREIGN KEY (created_by) REFERENCES app_user(app_user_id)
 );
-CREATE UNIQUE INDEX uq_issue_monthly_number ON issue (date_trunc('month', issue_date), monthly_number);
-
 
 CREATE INDEX idx_receipt_warehouse ON receipt(warehouse_id);
 CREATE UNIQUE INDEX uq_receipt_monthly_number ON receipt (date_trunc('month', issue_date), monthly_number);
 CREATE INDEX idx_receipt_issue_date ON receipt(issue_date);
 CREATE INDEX idx_receipt_supplier ON receipt(supplier_id);
+
+-- Salida por lote: agrupa una salida por pastor con la misma fecha, almacén y cobro ("L 3-10-26").
+CREATE TABLE issue_batch (
+    issue_batch_id BIGSERIAL PRIMARY KEY,
+    monthly_number INT NOT NULL,
+    batch_date TIMESTAMP NOT NULL,
+    warehouse_id BIGINT NOT NULL,
+    issue_type_id BIGINT,
+    description VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_by BIGINT,
+    CONSTRAINT fk_issue_batch_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouse(warehouse_id),
+    CONSTRAINT fk_issue_batch_issue_type FOREIGN KEY (issue_type_id) REFERENCES issue_type(issue_type_id),
+    CONSTRAINT fk_issue_batch_created_by FOREIGN KEY (created_by) REFERENCES app_user(app_user_id)
+);
 
 CREATE TABLE issue (
     issue_id BIGSERIAL PRIMARY KEY,
@@ -453,10 +466,16 @@ CREATE TABLE issue (
     CONSTRAINT fk_issue_warehouse_period FOREIGN KEY (warehouse_period_id) REFERENCES warehouse_period(warehouse_period_id),
     CONSTRAINT fk_issue_client FOREIGN KEY (client_id) REFERENCES client(client_id),
     CONSTRAINT fk_issue_print_type FOREIGN KEY (print_type_id) REFERENCES print_type(print_type_id),
-    CONSTRAINT fk_issue_created_by FOREIGN KEY (created_by) REFERENCES app_user(app_user_id)
+    issue_batch_id BIGINT, -- Salida por lote: el lote al que pertenece (NULL si es una salida suelta)
+    CONSTRAINT fk_issue_created_by FOREIGN KEY (created_by) REFERENCES app_user(app_user_id),
+    CONSTRAINT fk_issue_issue_batch FOREIGN KEY (issue_batch_id) REFERENCES issue_batch(issue_batch_id)
 );
 
 CREATE INDEX idx_issue_warehouse ON issue(warehouse_id);
+CREATE INDEX idx_issue_issue_batch ON issue(issue_batch_id);
+-- Las filas de una salida por lote comparten su N°: se controla en issue_batch.
+CREATE UNIQUE INDEX uq_issue_monthly_number ON issue (date_trunc('month', issue_date), monthly_number) WHERE issue_batch_id IS NULL;
+CREATE UNIQUE INDEX uq_issue_batch_monthly_number ON issue_batch (date_trunc('month', batch_date), monthly_number);
 CREATE INDEX idx_issue_issue_date ON issue(issue_date);
 CREATE INDEX idx_issue_client ON issue(client_id);
 
@@ -546,7 +565,7 @@ CREATE TABLE receipt_detail (
     receipt_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
     quantity NUMERIC(12,2) NOT NULL,
-    unit_price NUMERIC(12,2), -- Precio de compra; con retención unit_cost = unit_price x 0,92
+    unit_price NUMERIC(12,2), -- Precio de compra; con retención unit_cost = unit_price / 0,92
     unit_cost NUMERIC(12,2) NOT NULL,
     total_cost NUMERIC(12,2) NOT NULL,
     work_order VARCHAR(50),

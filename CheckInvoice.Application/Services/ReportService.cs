@@ -9,6 +9,7 @@ using CheckInvoice.core.Entities.Movements;
 using CheckInvoice.core.Entities.Parties;
 using CheckInvoice.core.Entities.Products;
 using CheckInvoice.core.Entities.Security;
+using CheckInvoice.core.Entities.Warehouses;
 using CheckInvoice.core.Interfaces;
 using CheckInvoice.core.QueryFilters.Reports;
 using Microsoft.EntityFrameworkCore;
@@ -893,7 +894,7 @@ public partial class ReportService : IReportService
 
                     table.Header(header =>
                     {
-                        header.Cell().Element(HeaderCell).Text("N° Salida");
+                        header.Cell().Element(HeaderCell).Text("N°");
                         header.Cell().Element(HeaderCell).Text("Código");
                         header.Cell().Element(HeaderCell).Text("Descripción");
                         header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
@@ -1209,7 +1210,7 @@ public partial class ReportService : IReportService
             : BuildIssueVoucherFullPageDocument(issueId, printTypeName, issueTypeName, issue, lines, total, warehouseName, clientName, inventoryManagerName, username, signatures,
                 string.IsNullOrWhiteSpace(publicBaseUrl) ? null : QrPng($"{publicBaseUrl.TrimEnd('/')}/issues/view/{issueId}"));
 
-        return WithTitle(document, $"Salida de Almacén N° {IssueNumbering.Format(issue.MonthlyNumber, issue.IssueDate, issueId)}").GeneratePdf();
+        return WithTitle(document, $"N° {IssueNumbering.Format(issue.MonthlyNumber, issue.IssueDate, issueId)}").GeneratePdf();
     }
 
     private static Document BuildIssueVoucherFullPageDocument(
@@ -1230,7 +1231,7 @@ public partial class ReportService : IReportService
         // inventarios", quien registró la salida.
         return BuildHalfLetterVoucher(new HalfLetterVoucher(
             Title: "SALIDA DE ALMACÉN",
-            NumberLabel: "NRO. DE SALIDA",
+            NumberLabel: "N°",
             NumberText: IssueNumbering.Format(issue.MonthlyNumber, issue.IssueDate, issueId),
             NumberSubText: null,
             InfoRows:
@@ -1306,7 +1307,7 @@ public partial class ReportService : IReportService
 
                     mainColumn.Item().Text(t =>
                     {
-                        t.Span("N° Salida: ").Bold();
+                        t.Span("N° ").Bold();
                         t.Span(IssueNumbering.Format(issue.MonthlyNumber, issue.IssueDate, issueId));
                     });
                     mainColumn.Item().Text(t =>
@@ -1603,12 +1604,61 @@ public partial class ReportService : IReportService
 
     public async Task<List<KardexByProductReportRowDto>> GetKardexByProductReport(KardexByProductReportQueryFilter filter)
     {
-        return await _unitOfWork.SqlQueryAsync<KardexByProductReportRowDto>(
+        var sections = await GetKardexByProductSections(filter);
+        return sections.SelectMany(s => s.Rows).ToList();
+    }
+
+    private async Task<List<KardexByProductReportRowDto>> GetKardexByProductRows(long productId, KardexByProductReportQueryFilter filter) =>
+        await _unitOfWork.SqlQueryAsync<KardexByProductReportRowDto>(
             GetKardexByProductReportSql,
-            filter.ProductId,
+            productId,
             filter.WarehouseId,
             (object?)filter.DateFrom ?? DBNull.Value,
             (object?)filter.DateTo ?? DBNull.Value);
+
+    // Un bloque del kardex por material: el producto, su saldo inicial y sus movimientos.
+    private sealed record KardexByProductSection(
+        string ProductLabel, KardexByProductOpeningBalanceDto Opening, List<KardexByProductReportRowDto> Rows);
+
+    // Con un producto, su bloque; sin producto ("Todos los productos"), un bloque por cada producto
+    // que pasó por el almacén y tiene saldo o movimientos en el periodo, por nombre.
+    private async Task<List<KardexByProductSection>> GetKardexByProductSections(KardexByProductReportQueryFilter filter)
+    {
+        var productIds = filter.ProductId.HasValue
+            ? [filter.ProductId.Value]
+            : await _unitOfWork.Repository<Stock>().Query()
+                .Where(s => s.WarehouseId == filter.WarehouseId)
+                .Select(s => s.ProductId)
+                .ToListAsync();
+        var products = await _unitOfWork.Repository<Product>().Query()
+            .Where(p => productIds.Contains(p.ProductId))
+            .OrderBy(p => p.Name)
+            .Select(p => new { p.ProductId, p.Code, p.Name })
+            .ToListAsync();
+
+        var sections = new List<KardexByProductSection>();
+        foreach (var product in products)
+        {
+            var rows = await GetKardexByProductRows(product.ProductId, filter);
+            var opening = await GetKardexByProductOpeningBalance(product.ProductId, filter.WarehouseId, filter.DateFrom);
+            if (!filter.ProductId.HasValue && rows.Count == 0 && opening.OpeningQuantity == 0)
+            {
+                continue;
+            }
+            sections.Add(new KardexByProductSection($"{product.Code} - {product.Name}", opening, rows));
+        }
+        return sections;
+    }
+
+    /// <summary>N° de comprobante de cada movimiento: "I 3-10-26" las entradas y "S 5-10-26" las salidas.</summary>
+    private async Task<Func<KardexByProductReportRowDto, string>> KardexVoucherLabels(IEnumerable<KardexByProductReportRowDto> rows)
+    {
+        var list = rows.ToList();
+        var noteNumbers = await ReceiptNoteNumbersAsync(list.Where(r => r.MovementType == "receipt").Select(r => r.VoucherId));
+        var issueNumbers = await IssueNumbering.NumbersAsync(_unitOfWork, list.Where(r => r.MovementType != "receipt").Select(r => r.VoucherId));
+        return row => row.MovementType == "receipt"
+            ? noteNumbers.GetValueOrDefault(row.VoucherId, row.VoucherId.ToString())
+            : issueNumbers.GetValueOrDefault(row.VoucherId, row.VoucherId.ToString().PadLeft(5, '0'));
     }
 
     private const string GetKardexByProductOpeningBalanceSql = """
@@ -1633,11 +1683,10 @@ public partial class ReportService : IReportService
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
-        var rows = await GetKardexByProductReport(filter);
-        var opening = await GetKardexByProductOpeningBalance(filter.ProductId, filter.WarehouseId, filter.DateFrom);
-
-        var product = await _unitOfWork.Repository<Product>().GetByIdAsync(filter.ProductId);
-        var productLabel = product is null ? "—" : $"{product.Code} - {product.Name}";
+        var sections = await GetKardexByProductSections(filter);
+        var allProducts = !filter.ProductId.HasValue;
+        var productLabel = allProducts ? "Todos los productos" : sections.FirstOrDefault()?.ProductLabel ?? "—";
+        var voucherLabel = await KardexVoucherLabels(sections.SelectMany(s => s.Rows));
 
         var warehouse = await _unitOfWork.Repository<Warehouse>().GetByIdAsync(filter.WarehouseId);
         var warehouseName = warehouse?.Name ?? "—";
@@ -1656,8 +1705,6 @@ public partial class ReportService : IReportService
             (null, not null) => $"Hasta {filter.DateTo:dd/MM/yyyy}",
             _ => "Todo el historial"
         };
-
-        var noteNumbers = await ReceiptNoteNumbersAsync(rows.Where(r => r.MovementType == "receipt").Select(r => r.VoucherId));
 
         var document = Document.Create(container =>
         {
@@ -1707,36 +1754,50 @@ public partial class ReportService : IReportService
                         header.Cell().Element(HeaderCell).AlignRight().Text("Total");
                     });
 
-                    var openingUnitValue = opening.OpeningQuantity == 0 ? 0 : opening.OpeningValue / opening.OpeningQuantity;
-
-                    table.Cell().Element(BodyCell).Text("");
-                    table.Cell().Element(BodyCell).Text("Saldo Inicial").Bold();
-                    table.Cell().Element(BodyCell).Text("");
-                    table.Cell().Element(BodyCell).Text("");
-                    table.Cell().Element(BodyCell).Text("");
-                    table.Cell().Element(BodyCell).Text("");
-                    table.Cell().Element(BodyCell).Text("");
-                    table.Cell().Element(BodyCell).Text("");
-                    table.Cell().Element(BodyCell).AlignRight().Text(Qty(opening.OpeningQuantity));
-                    table.Cell().Element(BodyCell).AlignRight().Text(openingUnitValue.ToString("N2", ReportCulture));
-                    table.Cell().Element(BodyCell).AlignRight().Text(opening.OpeningValue.ToString("N2", ReportCulture));
-
-                    foreach (var row in rows)
+                    if (sections.Count == 0)
                     {
-                        var isReceipt = row.MovementType == "receipt";
-                        var balanceUnitValue = row.BalanceQuantity == 0 ? 0 : row.BalanceValue / row.BalanceQuantity;
+                        table.Cell().ColumnSpan(11).Element(BodyCell).Text("Sin movimientos ni saldo en este almacén y periodo.");
+                    }
 
-                        table.Cell().Element(BodyCell).Text(row.VoucherDate.ToString("dd/MM/yyyy"));
-                        table.Cell().Element(BodyCell).Text(row.MovementType == "receipt" ? noteNumbers.GetValueOrDefault(row.VoucherId, row.VoucherId.ToString()) : row.VoucherId.ToString().PadLeft(5, '0'));
-                        table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? Qty(row.Quantity) : "");
-                        table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? row.UnitCost.ToString("N2", ReportCulture) : "");
-                        table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? row.TotalCost.ToString("N2", ReportCulture) : "");
-                        table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? Qty(row.Quantity) : "");
-                        table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? row.UnitCost.ToString("N2", ReportCulture) : "");
-                        table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? row.TotalCost.ToString("N2", ReportCulture) : "");
-                        table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.BalanceQuantity));
-                        table.Cell().Element(BodyCell).AlignRight().Text(balanceUnitValue.ToString("N2", ReportCulture));
-                        table.Cell().Element(BodyCell).AlignRight().Text(row.BalanceValue.ToString("N2", ReportCulture));
+                    foreach (var (sectionLabel, opening, rows) in sections)
+                    {
+                        // Con "Todos los productos", cada producto abre su bloque con su nombre.
+                        if (allProducts)
+                        {
+                            table.Cell().ColumnSpan(11).Element(GroupTitleCell).Text(sectionLabel).Bold().FontSize(9);
+                        }
+
+                        var openingUnitValue = opening.OpeningQuantity == 0 ? 0 : opening.OpeningValue / opening.OpeningQuantity;
+
+                        table.Cell().Element(BodyCell).Text("");
+                        table.Cell().Element(BodyCell).Text("Saldo Inicial").Bold();
+                        table.Cell().Element(BodyCell).Text("");
+                        table.Cell().Element(BodyCell).Text("");
+                        table.Cell().Element(BodyCell).Text("");
+                        table.Cell().Element(BodyCell).Text("");
+                        table.Cell().Element(BodyCell).Text("");
+                        table.Cell().Element(BodyCell).Text("");
+                        table.Cell().Element(BodyCell).AlignRight().Text(Qty(opening.OpeningQuantity));
+                        table.Cell().Element(BodyCell).AlignRight().Text(openingUnitValue.ToString("N2", ReportCulture));
+                        table.Cell().Element(BodyCell).AlignRight().Text(opening.OpeningValue.ToString("N2", ReportCulture));
+
+                        foreach (var row in rows)
+                        {
+                            var isReceipt = row.MovementType == "receipt";
+                            var balanceUnitValue = row.BalanceQuantity == 0 ? 0 : row.BalanceValue / row.BalanceQuantity;
+
+                            table.Cell().Element(BodyCell).Text(row.VoucherDate.ToString("dd/MM/yyyy"));
+                            table.Cell().Element(BodyCell).Text(voucherLabel(row));
+                            table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? Qty(row.Quantity) : "");
+                            table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? row.UnitCost.ToString("N2", ReportCulture) : "");
+                            table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? row.TotalCost.ToString("N2", ReportCulture) : "");
+                            table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? Qty(row.Quantity) : "");
+                            table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? row.UnitCost.ToString("N2", ReportCulture) : "");
+                            table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? row.TotalCost.ToString("N2", ReportCulture) : "");
+                            table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.BalanceQuantity));
+                            table.Cell().Element(BodyCell).AlignRight().Text(balanceUnitValue.ToString("N2", ReportCulture));
+                            table.Cell().Element(BodyCell).AlignRight().Text(row.BalanceValue.ToString("N2", ReportCulture));
+                        }
                     }
                 });
 
@@ -1882,7 +1943,7 @@ public partial class ReportService : IReportService
 
                             table.Header(header =>
                             {
-                                header.Cell().Element(HeaderCell).Text("N° Salida");
+                                header.Cell().Element(HeaderCell).Text("N°");
                                 header.Cell().Element(HeaderCell).Text("Fecha");
                                 header.Cell().Element(HeaderCell).Text("Fecha Límite");
                                 header.Cell().Element(HeaderCell).AlignRight().Text("Saldo Pendiente");
@@ -1930,7 +1991,7 @@ public partial class ReportService : IReportService
 
                             table.Header(header =>
                             {
-                                header.Cell().Element(HeaderCell).Text("N° Salida");
+                                header.Cell().Element(HeaderCell).Text("N°");
                                 header.Cell().Element(HeaderCell).Text("Fecha");
                                 header.Cell().Element(HeaderCell).AlignRight().Text("Total");
                             });
@@ -1962,7 +2023,7 @@ public partial class ReportService : IReportService
                             table.Header(header =>
                             {
                                 header.Cell().Element(HeaderCell).Text("Fecha");
-                                header.Cell().Element(HeaderCell).Text("N° Salida");
+                                header.Cell().Element(HeaderCell).Text("N°");
                                 header.Cell().Element(HeaderCell).AlignRight().Text("Monto");
                                 header.Cell().Element(HeaderCell).Text("Método");
                                 header.Cell().Element(HeaderCell).Text("Notas");
@@ -2191,7 +2252,7 @@ public partial class ReportService : IReportService
 
                         table.Header(header =>
                         {
-                            header.Cell().Element(HeaderCell).Text("N° Salida");
+                            header.Cell().Element(HeaderCell).Text("N°");
                             header.Cell().Element(HeaderCell).Text("Fecha");
                             header.Cell().Element(HeaderCell).Text("Fecha\nLímite");
                             header.Cell().Element(HeaderCell).Text("Código");

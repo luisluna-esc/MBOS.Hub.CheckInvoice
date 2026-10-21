@@ -8,4 +8,6 @@ public class ProductQueryFilter
     public long? SubDepartmentId { get; set; }
     public bool? IsActive { get; set; }
     public long? WarehouseId { get; set; }
+    /// <summary>Solo productos con stock (en el almacén pedido o, sin almacén, en alguno).</summary>
+    public bool? InStock { get; set; }
 }

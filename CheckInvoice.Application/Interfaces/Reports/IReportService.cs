@@ -32,6 +32,7 @@ public interface IReportService
     Task<byte[]> GenerateTransfersReportExcel(TransfersReportQueryFilter filter);
     Task<List<AccountingEntryRowDto>> GetIssuesAccountingReport(AccountingReportQueryFilter filter);
     Task<byte[]> GenerateIssuesAccountingExcel(AccountingReportQueryFilter filter);
+    Task<byte[]?> GenerateIssueBatchPdf(long issueBatchId);
     Task<List<AccountingEntryRowDto>> GetReceiptsAccountingReport(AccountingReportQueryFilter filter);
     Task<byte[]> GenerateReceiptsAccountingExcel(AccountingReportQueryFilter filter);
     /// <summary>TXT (separado por tabulaciones) con el mismo contenido que la versión Excel del reporte.</summary>

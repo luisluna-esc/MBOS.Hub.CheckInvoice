@@ -263,20 +263,34 @@ public class MenuService : IMenuService
             .OrderBy(m => m.DisplayOrder).ThenBy(m => m.Name)
             .ToListAsync();
 
-        var visibleByRole = allMenus
-            .Where(m => allowedMenuIdsForMyRoles.Contains(m.MenuId))
-            .ToList();
-
-        // Un grupo padre (sin ruta propia) no tiene sentido mostrarlo si ninguno
-        // de sus hijos quedó visible tras el filtro de rol.
-        var visibleChildCountByParent = visibleByRole
+        // Las pantallas (con ruta) se ven si el rol tiene su fila en menu_role. Un grupo (sin ruta,
+        // ej. Reportes o Reportes / Contabilidad) se ve cuando tiene alguna pantalla visible debajo,
+        // a cualquier nivel: así un grupo nuevo no hace falta asignarlo aparte a cada rol.
+        var childrenByParent = allMenus
             .Where(m => m.ParentMenuId.HasValue)
-            .GroupBy(m => m.ParentMenuId!.Value)
-            .ToDictionary(g => g.Key, g => g.Count());
+            .ToLookup(m => m.ParentMenuId!.Value);
+        var visibleIds = new HashSet<long>();
+        bool IsVisible(Menu menu, int depth)
+        {
+            if (depth > 10)
+            {
+                return false;
+            }
+            var visible = menu.Route != null
+                ? allowedMenuIdsForMyRoles.Contains(menu.MenuId)
+                : childrenByParent[menu.MenuId].Count(child => IsVisible(child, depth + 1)) > 0;
+            if (visible)
+            {
+                visibleIds.Add(menu.MenuId);
+            }
+            return visible;
+        }
+        foreach (var root in allMenus.Where(m => !m.ParentMenuId.HasValue))
+        {
+            IsVisible(root, 0);
+        }
 
-        var menus = visibleByRole
-            .Where(m => m.Route != null || visibleChildCountByParent.GetValueOrDefault(m.MenuId) > 0)
-            .ToList();
+        var menus = allMenus.Where(m => visibleIds.Contains(m.MenuId)).ToList();
 
         var menuPermissionIds = menus
             .Where(m => m.PermissionId.HasValue)

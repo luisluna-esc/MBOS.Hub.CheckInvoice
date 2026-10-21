@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CheckInvoice.Application.Services;
 
 // Número de la salida: correlativo dentro del mes de la fecha de la salida, igual que la nota de
-// ingreso ("MB 15-01-26"): "S 15-01-26" es la salida 15 de enero de 2026. Las salidas registradas
+// ingreso ("I 15-01-26"): "S 15-01-26" es la salida 15 de enero de 2026. Las salidas registradas
 // antes de este cambio no tienen número del mes y siguen mostrando su N° interno ("00019").
 internal static partial class IssueNumbering
 {

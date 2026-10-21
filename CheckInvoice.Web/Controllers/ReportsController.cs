@@ -220,6 +220,19 @@ public class ReportsController : ControllerBase
 
     [Authorize(Policy = "report.view")]
     [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("issue-batch/{issueBatchId}/pdf")]
+    public async Task<IActionResult> GetIssueBatchPdf(long issueBatchId)
+    {
+        var pdfBytes = await _reportService.GenerateIssueBatchPdf(issueBatchId);
+        if (pdfBytes is null)
+        {
+            return NotFound();
+        }
+        return File(pdfBytes, "application/pdf", $"lote-{issueBatchId}.pdf");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
     [HttpGet("issue-voucher/{issueId}/pdf")]
     public async Task<IActionResult> GetIssueVoucherPdf(long issueId, [FromQuery] long? printTypeId, [FromServices] IConfiguration configuration)
     {

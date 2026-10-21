@@ -26,7 +26,15 @@ public partial class ReportService
     // Encabezado de los reportes: logo e institución a la izquierda, título a la derecha y una
     // franja suave con los filtros ("Almacén: X", "Periodo: Y"...). Cada línea se separa en
     // etiqueta y valor en el primer ": " para mostrarlas como pares, no como frases centradas.
-    private static void ReportHeader(IContainer container, string title, params string?[] info)
+    private static void ReportHeader(IContainer container, string title, params string?[] info) =>
+        ReportHeaderCore(container, title, true, info);
+
+    // Igual que ReportHeader, para hojas sin montos (ej. la hoja de firmas de un lote): sin la
+    // línea "Expresado en bolivianos".
+    private static void ReportHeaderWithoutCurrency(IContainer container, string title, params string?[] info) =>
+        ReportHeaderCore(container, title, false, info);
+
+    private static void ReportHeaderCore(IContainer container, string title, bool inBolivianos, string?[] info)
     {
         container.PaddingBottom(8).Column(column =>
         {
@@ -44,7 +52,10 @@ public partial class ReportService
                 row.RelativeItem(1.3f).AlignRight().AlignMiddle().Column(c =>
                 {
                     c.Item().AlignRight().Text(title).Bold().FontSize(15).FontColor(ReportAccent);
-                    c.Item().AlignRight().Text("Expresado en bolivianos (Bs.)").FontSize(7.5f).FontColor(ReportMuted);
+                    if (inBolivianos)
+                    {
+                        c.Item().AlignRight().Text("Expresado en bolivianos (Bs.)").FontSize(7.5f).FontColor(ReportMuted);
+                    }
                 });
             });
 

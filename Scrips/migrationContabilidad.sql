@@ -3,7 +3,7 @@
 -- Se puede correr más de una vez. Correr ANTES de levantar el backend nuevo.
 --
 -- Cada producto de una salida sale en una fila con:
---   AccountCode 4121565 | SubAccountCode = código del departamento del producto |
+--   AccountCode 1146002 (antes 4121565) | SubAccountCode = código del departamento del producto |
 --   FundCode 10 | FunctionCode 0000 | RestrictionCode 0A | EntityValue = total (negativo) |
 --   SendMemo False | Description "S-N° - X Uds. Producto"
 -- =====================================================================================

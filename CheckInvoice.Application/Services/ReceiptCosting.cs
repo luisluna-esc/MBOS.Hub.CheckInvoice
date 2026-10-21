@@ -1,7 +1,7 @@
 namespace CheckInvoice.Application.Services;
 
 // Compras: con factura el costo unitario es el precio; con retención (sin factura) el costo
-// unitario es el precio por 0,92. Los nombres son los de la tabla receipt_type.
+// unitario es el precio dividido entre 0,92. Los nombres son los de la tabla receipt_type.
 internal static class ReceiptCosting
 {
     public const string PurchaseWithInvoice = "Compras con Factura";
@@ -22,10 +22,10 @@ internal static class ReceiptCosting
         receiptTypeName is Adjustment or InitialInventory or Donation;
 
     public static decimal UnitCost(decimal unitPrice, bool withRetention) =>
-        withRetention ? Math.Round(unitPrice * RetentionCostFactor, 2, MidpointRounding.AwayFromZero) : unitPrice;
+        withRetention ? Math.Round(unitPrice / RetentionCostFactor, 2, MidpointRounding.AwayFromZero) : unitPrice;
 
     public static decimal TotalCost(decimal quantity, decimal unitPrice, bool withRetention) =>
         withRetention
-            ? Math.Round(quantity * unitPrice * RetentionCostFactor, 2, MidpointRounding.AwayFromZero)
+            ? Math.Round(quantity * unitPrice / RetentionCostFactor, 2, MidpointRounding.AwayFromZero)
             : quantity * unitPrice;
 }

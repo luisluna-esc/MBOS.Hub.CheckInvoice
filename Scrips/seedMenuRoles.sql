@@ -83,7 +83,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO menu_role (menu_id, role_id)
 SELECT m.menu_id, r.role_id
 FROM menu m, role r
-WHERE m.name IN ('Reportes', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Historial de Entradas', 'Historial de Salidas', 'Transferencias de Almacén', 'Salidas para Contabilidad', 'Ingresos para Contabilidad', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar')
+WHERE m.name IN ('Reportes', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Historial de Entradas', 'Historial de Salidas', 'Transferencias de Almacén', 'Contabilidad', 'Salidas para Contabilidad', 'Ingresos para Contabilidad', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar')
   AND r.name IN ('Auxiliar Contador', 'Contador', 'Tesorero', 'M-BOS')
 ON CONFLICT DO NOTHING;
 
@@ -131,7 +131,7 @@ WHERE r.is_active
     'Cuentas por Cobrar',
     'Pastores',
     'Mi Cuenta',
-    'Reportes', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Historial de Entradas', 'Historial de Salidas', 'Transferencias de Almacén', 'Salidas para Contabilidad', 'Ingresos para Contabilidad', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar',
+    'Reportes', 'Stock - Almacén', 'Stock - Departamento', 'Kardex Físico Valorado', 'Levantamiento de Inventario', 'Salidas de Almacén', 'Ingresos de Almacén', 'Historial de Entradas', 'Historial de Salidas', 'Transferencias de Almacén', 'Contabilidad', 'Salidas para Contabilidad', 'Ingresos para Contabilidad', 'Kardex por Material', 'Campo Pastor', 'Cartera de Cuentas por Cobrar',
     'Configuración del Sistema', 'Países', 'Tipos de Documento', 'Tipos de Iglesia', 'Tipos de Impresión',
     'Tipos de Salida', 'Tipos de Entrada', 'Tipos de Medio', 'Departamentos', 'Subdepartamentos',
     'Misiones', 'Provincias', 'Casos Especiales', 'Motivos de Anulación', 'Almacenes', 'Períodos de Almacén', 'Inventario Inicial'

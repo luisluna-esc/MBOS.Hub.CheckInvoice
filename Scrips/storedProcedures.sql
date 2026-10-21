@@ -86,7 +86,9 @@ AS $$
         ORDER BY vr2.issue_void_request_id DESC
         LIMIT 1
     ) vctx ON true
-    WHERE (p_issue_id IS NULL OR i.issue_id = p_issue_id)
+    WHERE (p_issue_id IS NULL OR i.issue_id = p_issue_id
+           -- Salida por lote: el mismo N° es de todos sus pastores.
+           OR i.issue_batch_id = (SELECT x.issue_batch_id FROM issue x WHERE x.issue_id = p_issue_id))
       AND (p_client_id IS NULL OR i.client_id = p_client_id)
       AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
       AND (p_issue_type_id IS NULL OR i.issue_type_id = p_issue_type_id)
@@ -1541,7 +1543,7 @@ STABLE
 AS $$
     WITH pending AS (
         SELECT 'toVerify'::varchar AS kind, 'receipt'::varchar AS document_type, r.receipt_id AS document_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') AS number,
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') AS number,
                rt.name::text AS detail, NULL::varchar AS status, r.created_at AS at
         FROM receipt r LEFT JOIN receipt_type rt ON rt.receipt_type_id = r.receipt_type_id
         WHERE p_can_verify AND NOT r.is_voided AND r.review_status = 'digitado'
@@ -1558,7 +1560,7 @@ AS $$
         WHERE p_can_verify AND NOT t.is_voided AND t.review_status = 'digitado'
         UNION ALL
         SELECT 'toApprove', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), rt.name::text, NULL, r.created_at
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), rt.name::text, NULL, r.created_at
         FROM receipt r LEFT JOIN receipt_type rt ON rt.receipt_type_id = r.receipt_type_id
         WHERE p_can_approve AND NOT r.is_voided AND r.review_status = 'verificado'
         UNION ALL
@@ -1574,7 +1576,7 @@ AS $$
         WHERE p_can_approve AND NOT t.is_voided AND t.review_status = 'verificado'
         UNION ALL
         SELECT 'voidRequest', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), v.detail::text, NULL, v.requested_at
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), v.detail::text, NULL, v.requested_at
         FROM receipt_void_request v JOIN receipt r ON r.receipt_id = v.receipt_id
         WHERE p_can_approve AND v.status = 'pending'
         UNION ALL
@@ -1587,7 +1589,7 @@ AS $$
         WHERE p_can_approve AND v.status = 'pending'
         UNION ALL
         SELECT 'receiptEdit', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.reason::text, NULL, c.requested_at
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.reason::text, NULL, c.requested_at
         FROM change_request c JOIN receipt r ON r.receipt_id = c.record_id
         WHERE p_can_approve AND c.table_name = 'receipt_edit' AND c.status = 'pending'
         UNION ALL
@@ -1599,7 +1601,7 @@ AS $$
     -- de sus documentos, aprobados o rechazados).
     notifications AS (
         SELECT 'voidRequest'::varchar AS kind, 'receipt'::varchar AS document_type, r.receipt_id AS document_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') AS number,
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') AS number,
                v.review_notes::text AS detail, v.status AS status, v.reviewed_at AS at,
                'receipt_void:' || v.receipt_void_request_id AS notification_key
         FROM receipt_void_request v JOIN receipt r ON r.receipt_id = v.receipt_id
@@ -1616,7 +1618,7 @@ AS $$
         WHERE v.requested_by = p_user_id AND v.status <> 'pending'
         UNION ALL
         SELECT 'receiptEdit', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.review_notes::text, c.status, c.reviewed_at,
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.review_notes::text, c.status, c.reviewed_at,
                'receipt_edit:' || c.change_request_id
         FROM change_request c JOIN receipt r ON r.receipt_id = c.record_id
         WHERE c.table_name = 'receipt_edit' AND c.requested_by = p_user_id AND c.status <> 'pending'
@@ -1630,7 +1632,7 @@ AS $$
         SELECT CASE WHEN d.action = 'aprobado' THEN 'reviewApproved' ELSE 'reviewRejected' END::varchar,
                d.document_type, d.document_id,
                CASE WHEN d.document_type = 'receipt'
-                    THEN (SELECT 'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') FROM receipt r WHERE r.receipt_id = d.document_id)
+                    THEN (SELECT 'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') FROM receipt r WHERE r.receipt_id = d.document_id)
                     WHEN d.document_type = 'issue' THEN fn_issue_number(d.document_id)
                     ELSE lpad(d.document_id::text, 5, '0') END,
                d.reason::text,
@@ -1649,7 +1651,7 @@ AS $$
     signed AS (
         SELECT 'reviewSigned'::varchar AS kind, d.document_type::varchar AS document_type, d.document_id AS document_id,
                CASE WHEN d.document_type = 'receipt'
-                    THEN (SELECT 'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') FROM receipt r WHERE r.receipt_id = d.document_id)
+                    THEN (SELECT 'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') FROM receipt r WHERE r.receipt_id = d.document_id)
                     WHEN d.document_type = 'issue' THEN fn_issue_number(d.document_id)
                     ELSE lpad(d.document_id::text, 5, '0') END AS number,
                d.reason::text AS detail, d.action::varchar AS status, d.at AS at
@@ -1657,7 +1659,7 @@ AS $$
         WHERE d.user_id = p_user_id AND d.action IN ('verificado', 'aprobado', 'rechazado', 'reabierto')
         UNION ALL
         SELECT 'voidRequest', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), v.review_notes::text, v.status, v.reviewed_at
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), v.review_notes::text, v.status, v.reviewed_at
         FROM receipt_void_request v JOIN receipt r ON r.receipt_id = v.receipt_id
         WHERE v.reviewed_by = p_user_id AND v.status <> 'pending'
         UNION ALL
@@ -1670,7 +1672,7 @@ AS $$
         WHERE v.reviewed_by = p_user_id AND v.status <> 'pending'
         UNION ALL
         SELECT 'receiptEdit', 'receipt', r.receipt_id,
-               'MB ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.review_notes::text, c.status, c.reviewed_at
+               'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.review_notes::text, c.status, c.reviewed_at
         FROM change_request c JOIN receipt r ON r.receipt_id = c.record_id
         WHERE c.table_name = 'receipt_edit' AND c.reviewed_by = p_user_id AND c.status <> 'pending'
         UNION ALL
@@ -1771,4 +1773,58 @@ AS $$
         RETURNING 1
     )
     SELECT count(*)::int FROM inserted;
+$$;
+
+-- Hoja de firmas de una salida por lote: una fila por pastor y material.
+CREATE OR REPLACE FUNCTION sp_get_issue_batch_sheet(p_issue_batch_id BIGINT)
+RETURNS TABLE (
+    issue_batch_id BIGINT,
+    monthly_number INT,
+    batch_date TIMESTAMP,
+    warehouse_name VARCHAR,
+    description VARCHAR,
+    created_by_name TEXT,
+    issue_id BIGINT,
+    is_voided BOOLEAN,
+    client_name VARCHAR,
+    tax_id VARCHAR,
+    district_name VARCHAR,
+    product_id BIGINT,
+    product_code VARCHAR,
+    product_name VARCHAR,
+    department_name VARCHAR,
+    quantity NUMERIC
+)
+LANGUAGE sql
+STABLE
+AS $$
+    SELECT
+        b.issue_batch_id,
+        b.monthly_number,
+        b.batch_date,
+        w.name AS warehouse_name,
+        b.description,
+        (au.first_name || ' ' || au.last_name) AS created_by_name,
+        i.issue_id,
+        i.is_voided,
+        cp.name AS client_name,
+        cp.tax_id,
+        dt.district_name,
+        p.product_id,
+        p.code AS product_code,
+        p.name AS product_name,
+        dep.name AS department_name,
+        d.quantity
+    FROM issue_batch b
+    JOIN issue i ON i.issue_batch_id = b.issue_batch_id
+    JOIN issue_detail d ON d.issue_id = i.issue_id
+    JOIN product p ON p.product_id = d.product_id
+    LEFT JOIN department dep ON dep.department_id = p.department_id
+    LEFT JOIN warehouse w ON w.warehouse_id = b.warehouse_id
+    LEFT JOIN app_user au ON au.app_user_id = b.created_by
+    LEFT JOIN client c ON c.client_id = i.client_id
+    LEFT JOIN party cp ON cp.party_id = c.party_id
+    LEFT JOIN district dt ON dt.district_id = c.district_id
+    WHERE b.issue_batch_id = p_issue_batch_id
+    ORDER BY dt.district_name, cp.name, p.name;
 $$;

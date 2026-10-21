@@ -22,7 +22,7 @@ public class AccountingEntryRowDto
     public string? WarehouseName { get; set; }
     public string? DepartmentName { get; set; }
     public string? ProductCode { get; set; }
-    /// <summary>Solo en entradas: N° de nota ("MB 3-10-26") y tipo de entrada.</summary>
+    /// <summary>Solo en entradas: N° de nota ("I 3-10-26") y tipo de entrada.</summary>
     public string? DocumentNumber { get; set; }
     public string? DocumentType { get; set; }
 }

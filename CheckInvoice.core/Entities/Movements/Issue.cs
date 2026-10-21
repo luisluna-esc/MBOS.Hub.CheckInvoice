@@ -19,4 +19,6 @@ public class Issue
     // Revisión: "digitado" -> "verificado" -> "aprobado"; reabrir vuelve a "digitado" y sube la versión.
     public string ReviewStatus { get; set; } = "digitado";
     public int ReviewVersion { get; set; } = 1;
+    // Salida por lote: el lote al que pertenece (null si es una salida suelta).
+    public long? IssueBatchId { get; set; }
 }

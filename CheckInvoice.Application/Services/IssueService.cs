@@ -22,7 +22,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CheckInvoice.Application.Services;
 
-public class IssueService : IIssueService
+public partial class IssueService : IIssueService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly PaginationOptions _paginationOptions;
@@ -66,6 +66,7 @@ public class IssueService : IIssueService
             void_reason_name AS "VoidReasonName",
             void_detail AS "VoidDetail",
             NULL::varchar AS "ReviewStatus",
+            NULL::bigint AS "IssueBatchId",
             total_records AS "TotalRecords"
         FROM sp_get_issues({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::int, {5}::int, {6}::varchar)
         """;
@@ -109,7 +110,7 @@ public class IssueService : IIssueService
         var pageIds = rows.Select(r => r.IssueId).ToList();
         var extras = await _unitOfWork.Repository<Issue>().Query()
             .Where(i => pageIds.Contains(i.IssueId))
-            .Select(i => new { i.IssueId, i.ReviewStatus, i.MonthlyNumber })
+            .Select(i => new { i.IssueId, i.ReviewStatus, i.MonthlyNumber, i.IssueBatchId })
             .ToDictionaryAsync(i => i.IssueId);
         var pendingEdits = await _unitOfWork.Repository<ChangeRequest>().Query()
             .Where(c => c.TableName == IssueEditService.TableName && c.Status == "pending" && pageIds.Contains(c.RecordId))
@@ -119,6 +120,7 @@ public class IssueService : IIssueService
         {
             var extra = extras.GetValueOrDefault(row.IssueId);
             row.ReviewStatus = extra?.ReviewStatus;
+            row.IssueBatchId = extra?.IssueBatchId;
             row.NoteNumber = IssueNumbering.Format(extra?.MonthlyNumber, row.IssueDate, row.IssueId);
             row.HasPendingChangeRequest = row.HasPendingChangeRequest || pendingEdits.Contains(row.IssueId);
         }

@@ -45,6 +45,7 @@ public class IssueVoidRequestService : IIssueVoidRequestService
         SELECT
             issue_void_request_id AS "IssueVoidRequestId",
             issue_id AS "IssueId",
+            NULL::varchar AS "NoteNumber",
             issue_date AS "IssueDate",
             client_name AS "ClientName",
             warehouse_name AS "WarehouseName",
@@ -90,8 +91,10 @@ public class IssueVoidRequestService : IIssueVoidRequestService
 
         // SqlQueryRaw no pasa por el ValueConverter global de AppDbContext que marca todo
         // DateTime como Utc al leer (ver AppDbContext.OnModelCreating).
+        var noteNumbers = await IssueNumbering.NumbersAsync(_unitOfWork, rows.Select(r => r.IssueId));
         foreach (var row in rows)
         {
+            row.NoteNumber = noteNumbers.GetValueOrDefault(row.IssueId);
             row.IssueDate = DateTime.SpecifyKind(row.IssueDate, DateTimeKind.Utc);
             row.RequestedAt = DateTime.SpecifyKind(row.RequestedAt, DateTimeKind.Utc);
             if (row.ReviewedAt.HasValue)

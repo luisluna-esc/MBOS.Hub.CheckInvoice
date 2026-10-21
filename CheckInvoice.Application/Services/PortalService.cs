@@ -49,6 +49,7 @@ public class PortalService : IPortalService
             .Where(i => issueIds.Contains(i.IssueId))
             .ToDictionaryAsync(i => i.IssueId, i => i.IssueDate);
         var linesByIssue = await ReceivableLines.ForIssuesAsync(_unitOfWork, issueIds);
+        var noteNumbers = await IssueNumbering.NumbersAsync(_unitOfWork, issueIds);
 
         var accountIds = accounts.Select(a => a.AccountReceivableId).ToList();
         var paymentsByAccount = (await _unitOfWork.Repository<Payment>().Query()
@@ -63,6 +64,7 @@ public class PortalService : IPortalService
             {
                 AccountReceivableId = a.AccountReceivableId,
                 IssueId = a.IssueId,
+                NoteNumber = a.IssueId.HasValue ? noteNumbers.GetValueOrDefault(a.IssueId.Value) : null,
                 IssueDate = a.IssueId.HasValue && issueDatesById.TryGetValue(a.IssueId.Value, out var issueDate) ? issueDate : null,
                 DueDate = a.DueDate,
                 Status = AccountReceivableStatus.Effective(a.Status, a.DueDate),

@@ -43,6 +43,7 @@ public class AccountReceivableService : IAccountReceivableService
         SELECT
             account_receivable_id AS "AccountReceivableId",
             issue_id AS "IssueId",
+            NULL::varchar AS "NoteNumber",
             issue_date AS "IssueDate",
             client_id AS "ClientId",
             total_amount AS "TotalAmount",
@@ -80,8 +81,10 @@ public class AccountReceivableService : IAccountReceivableService
 
         // Mismo motivo que en IssueService: SqlQueryRaw no pasa por el ValueConverter global
         // de AppDbContext que marca todo DateTime como Utc al leer.
+        var noteNumbers = await IssueNumbering.NumbersAsync(_unitOfWork, rows.Where(r => r.IssueId.HasValue).Select(r => r.IssueId!.Value));
         foreach (var row in rows)
         {
+            row.NoteNumber = row.IssueId is long issueId ? noteNumbers.GetValueOrDefault(issueId) : null;
             row.CreatedAt = DateTime.SpecifyKind(row.CreatedAt, DateTimeKind.Utc);
             if (row.IssueDate.HasValue)
             {

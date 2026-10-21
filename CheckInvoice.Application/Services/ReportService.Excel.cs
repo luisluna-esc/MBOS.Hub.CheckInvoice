@@ -119,7 +119,7 @@ public partial class ReportService
         };
         var columns = new List<ExcelColumn<IssuesReportRowDto>>
         {
-            new("N° Salida", r => IssueNo(r.IssueId)),
+            new("N°", r => IssueNo(r.IssueId)),
             new("Departamento", r => r.DepartmentName ?? "(Sin categoría)"),
             new("Subdepartamento", r => r.SubDepartmentName ?? "(Sin subcategoría)"),
             new("Código", r => r.Code),
@@ -159,49 +159,54 @@ public partial class ReportService
     }
 
     private sealed record KardexMovementExcelRow(
-        DateTime? Date, string Voucher, string Type,
+        string Product, DateTime? Date, string Voucher, string Type,
         decimal? InQuantity, decimal? InUnitCost, decimal? InTotal,
         decimal? OutQuantity, decimal? OutUnitCost, decimal? OutTotal,
         decimal BalanceQuantity, decimal BalanceUnitValue, decimal BalanceValue);
 
     public async Task<byte[]> GenerateKardexByProductReportExcel(KardexByProductReportQueryFilter filter)
     {
-        var rows = await GetKardexByProductReport(filter);
-        var noteNumbers = await ReceiptNoteNumbersAsync(rows.Where(r => r.MovementType == "receipt").Select(r => r.VoucherId));
-        var opening = await GetKardexByProductOpeningBalance(filter.ProductId, filter.WarehouseId, filter.DateFrom);
+        var sections = await GetKardexByProductSections(filter);
+        var allProducts = !filter.ProductId.HasValue;
+        var voucherLabel = await KardexVoucherLabels(sections.SelectMany(s => s.Rows));
 
-        var product = await _unitOfWork.Repository<Product>().GetByIdAsync(filter.ProductId);
-        var productLabel = product is null ? "—" : $"{product.Code} - {product.Name}";
-
-        var movements = new List<KardexMovementExcelRow>
+        var movements = new List<KardexMovementExcelRow>();
+        foreach (var (productLabel, opening, rows) in sections)
         {
-            new(null, "Saldo inicial", "", null, null, null, null, null, null,
+            movements.Add(new(productLabel, null, "Saldo inicial", "", null, null, null, null, null, null,
                 opening.OpeningQuantity,
                 opening.OpeningQuantity == 0 ? 0 : opening.OpeningValue / opening.OpeningQuantity,
-                opening.OpeningValue)
-        };
-        foreach (var row in rows)
-        {
-            var isReceipt = row.MovementType == "receipt";
-            movements.Add(new KardexMovementExcelRow(
-                row.VoucherDate.Date,
-                isReceipt ? noteNumbers.GetValueOrDefault(row.VoucherId, row.VoucherId.ToString()) : row.VoucherId.ToString().PadLeft(5, '0'),
-                isReceipt ? "Ingreso" : "Salida",
-                isReceipt ? row.Quantity : null, isReceipt ? row.UnitCost : null, isReceipt ? row.TotalCost : null,
-                isReceipt ? null : row.Quantity, isReceipt ? null : row.UnitCost, isReceipt ? null : row.TotalCost,
-                row.BalanceQuantity,
-                row.BalanceQuantity == 0 ? 0 : row.BalanceValue / row.BalanceQuantity,
-                row.BalanceValue));
+                opening.OpeningValue));
+            foreach (var row in rows)
+            {
+                var isReceipt = row.MovementType == "receipt";
+                movements.Add(new KardexMovementExcelRow(
+                    productLabel,
+                    row.VoucherDate.Date,
+                    voucherLabel(row),
+                    isReceipt ? "Ingreso" : "Salida",
+                    isReceipt ? row.Quantity : null, isReceipt ? row.UnitCost : null, isReceipt ? row.TotalCost : null,
+                    isReceipt ? null : row.Quantity, isReceipt ? null : row.UnitCost, isReceipt ? null : row.TotalCost,
+                    row.BalanceQuantity,
+                    row.BalanceQuantity == 0 ? 0 : row.BalanceValue / row.BalanceQuantity,
+                    row.BalanceValue));
+            }
         }
 
         var info = new List<string>
         {
-            $"Producto: {productLabel}",
+            $"Producto: {(allProducts ? "Todos los productos" : sections.FirstOrDefault()?.ProductLabel ?? "—")}",
             $"Almacén: {await WarehouseNameAsync(filter.WarehouseId)}",
             $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}"
         };
-        var columns = new List<ExcelColumn<KardexMovementExcelRow>>
+        var columns = new List<ExcelColumn<KardexMovementExcelRow>>();
+        // Con todos los productos, cada fila dice de qué producto es (para filtrar en el Excel).
+        if (allProducts)
         {
+            columns.Add(new("Producto", r => r.Product));
+        }
+        columns.AddRange(
+        [
             new("Fecha", r => r.Date, DateFormat),
             new("N° Comprobante", r => r.Voucher),
             new("Tipo", r => r.Type),
@@ -214,7 +219,7 @@ public partial class ReportService
             new("Saldo cant.", r => r.BalanceQuantity, QuantityFormat),
             new("Saldo costo unit.", r => r.BalanceUnitValue, MoneyFormat),
             new("Saldo total", r => r.BalanceValue, MoneyFormat)
-        };
+        ]);
         return await BuildWorkbookAsync(wb => AddSheet(wb, "Kardex por material", "KARDEX POR MATERIAL", info, columns, movements));
     }
 
@@ -232,7 +237,7 @@ public partial class ReportService
         };
         var receivableColumns = new List<ExcelColumn<PastorFieldReceivableRowDto>>
         {
-            new("N° Salida", r => IssueNo(r.IssueId)),
+            new("N°", r => IssueNo(r.IssueId)),
             new("Fecha", r => r.IssueDate?.Date, DateFormat),
             new("Fecha límite", r => r.DueDate?.ToDateTime(TimeOnly.MinValue), DateFormat),
             new("Saldo pendiente", r => r.OutstandingBalance, MoneyFormat, Total: true),
@@ -240,7 +245,7 @@ public partial class ReportService
         };
         var deliveryColumns = new List<ExcelColumn<PastorFieldDeliveryRowDto>>
         {
-            new("N° Salida", r => IssueNo(r.IssueId)),
+            new("N°", r => IssueNo(r.IssueId)),
             new("Fecha", r => r.IssueDate.Date, DateFormat),
             new("Total", r => r.Total, MoneyFormat, Total: true)
         };
@@ -248,7 +253,7 @@ public partial class ReportService
         {
             // Momento exacto del pago (UTC) pasado a la hora de Bolivia.
             new("Fecha", r => BoliviaTime.FromUtc(r.PaymentDate).Date, DateFormat),
-            new("N° Salida", r => IssueNo(r.IssueId)),
+            new("N°", r => IssueNo(r.IssueId)),
             new("Monto", r => r.Amount, MoneyFormat, Total: true),
             new("Método", r => PaymentMethodLabel(r.PaymentMethod)),
             new("Notas", r => r.Notes)
@@ -289,7 +294,7 @@ public partial class ReportService
         var columns = new List<ExcelColumn<ReceivableProductRow>>
         {
             new("Cliente", r => r.Account.ClientName ?? "(Sin cliente)"),
-            new("N° Salida", r => IssueNo(r.Account.IssueId)),
+            new("N°", r => IssueNo(r.Account.IssueId)),
             new("Fecha", r => r.Account.IssueDate?.Date, DateFormat),
             new("Fecha límite", r => r.Account.DueDate?.ToDateTime(TimeOnly.MinValue), DateFormat)
         };

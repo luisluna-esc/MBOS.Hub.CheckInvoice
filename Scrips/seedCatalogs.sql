@@ -36,7 +36,8 @@ INSERT INTO province (name) VALUES
 ON CONFLICT DO NOTHING;
 
 INSERT INTO issue_type (name, is_active) VALUES
-('Salida Normal', TRUE), ('Salida por Regalo', TRUE), ('Salida por Prestamo', TRUE), ('Salida por Merma', TRUE)
+('Salida Normal', TRUE), ('Salida por Regalo', TRUE), ('Salida por Prestamo', TRUE), ('Salida por Merma', TRUE),
+('Salida por Lote', TRUE)
 ON CONFLICT DO NOTHING;
 
 -- 'Devolucion' y 'Ajuste' no se ofrecen en el select manual de Entrada (ver

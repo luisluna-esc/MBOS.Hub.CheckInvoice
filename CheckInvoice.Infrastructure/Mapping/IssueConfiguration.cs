@@ -68,5 +68,8 @@ public class IssueConfiguration : IEntityTypeConfiguration<Issue>
               .IsRequired()
               .HasColumnName("review_version")
               .HasDefaultValue(1);
+
+        entity.Property(e => e.IssueBatchId)
+              .HasColumnName("issue_batch_id");
     }
 }

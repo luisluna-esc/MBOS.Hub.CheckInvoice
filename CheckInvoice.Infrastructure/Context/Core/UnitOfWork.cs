@@ -24,6 +24,14 @@ public class UnitOfWork : IUnitOfWork
 
     public Task<int> SaveChangesAsync() => _context.SaveChangesAsync();
 
+    public async Task<T> InTransactionAsync<T>(Func<Task<T>> work)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        var result = await work();
+        await transaction.CommitAsync();
+        return result;
+    }
+
     public Task<List<T>> SqlQueryAsync<T>(string sql, params object[] parameters) where T : class
         => _context.Database.SqlQueryRaw<T>(sql, parameters).ToListAsync();
 

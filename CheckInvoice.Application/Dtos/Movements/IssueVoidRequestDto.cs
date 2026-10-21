@@ -4,6 +4,8 @@ public class IssueVoidRequestDto
 {
     public long IssueVoidRequestId { get; set; }
     public long IssueId { get; set; }
+    /// <summary>N° de la salida como se imprime ("S 5-10-26").</summary>
+    public string? NoteNumber { get; set; }
     public DateTime IssueDate { get; set; }
     public string? ClientName { get; set; }
     public string? WarehouseName { get; set; }

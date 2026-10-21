@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CheckInvoice.Application.Services;
 
 // Número de la nota de ingreso: correlativo dentro del mes de la fecha de ingreso, con prefijo y
-// año como los lotes contables: "MB 15-01-26" es la nota 15 de enero de 2026. Las entradas
+// año como los lotes contables: "I 15-01-26" es la nota 15 de enero de 2026. Las entradas
 // registradas tarde toman el siguiente número de SU mes.
 internal static partial class ReceiptNumbering
 {
@@ -25,21 +25,27 @@ internal static partial class ReceiptNumbering
         return (last ?? 0) + 1;
     }
 
-    public const string Prefix = "MB";
+    public const string Prefix = "I";
+    // Prefijo que se usó antes: se sigue aceptando al buscar por número.
+    private const string LegacyPrefix = "MB";
 
     public static string Format(int? monthlyNumber, DateTime entryDate, long receiptId) =>
         monthlyNumber.HasValue
             ? $"{Prefix} {monthlyNumber.Value}-{entryDate.ToString("MM-yy", CultureInfo.InvariantCulture)}"
             : receiptId.ToString(CultureInfo.InvariantCulture);
 
-    // Acepta "MB 15-01-26", "15-01-26", "15-01-2026" o "15-01". Sin año, el más reciente.
+    // Acepta "I 15-01-26" (o "MB 15-01-26"), "15-01-26", "15-01-2026" o "15-01". Sin año, el más reciente.
     public static bool TryParse(string? text, out int number, out int month, out int? year)
     {
         number = 0;
         month = 0;
         year = null;
         var clean = (text ?? string.Empty).Trim();
-        if (clean.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
+        if (clean.StartsWith(LegacyPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            clean = clean[LegacyPrefix.Length..].Trim();
+        }
+        else if (clean.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
         {
             clean = clean[Prefix.Length..].Trim();
         }
