@@ -11,4 +11,6 @@ public class TransferQueryFilter
     public DateTime? DateFrom { get; set; }
     public DateTime? DateTo { get; set; }
     public bool? IsApproved { get; set; }
+    /// <summary>"updated": con la firma de aprobación del Contador; "outdated": sin ella.</summary>
+    public string? ReviewState { get; set; }
 }

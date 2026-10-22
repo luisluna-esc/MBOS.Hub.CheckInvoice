@@ -197,6 +197,8 @@ public class ClientService : IClientService
         // El vínculo de identidad no se cambia desde aquí: se excluye la propia
         // Party para que la validación de NIT/correo únicos no choque contra sí misma.
         clientDto.PartyId = client.PartyId;
+        // Y el propio cliente, para que "un pastor por distrito/iglesia" no lo cuente a él mismo.
+        clientDto.ClientId = client.ClientId;
 
         var validationResult = await _validator.ValidateAsync(clientDto);
         var errors = validationResult.Errors
@@ -495,4 +497,23 @@ public class ClientService : IClientService
         return new string(bytes.Select(b => chars[b % chars.Length]).ToArray());
     }
 
+    /// <summary>Mientras se escribe el NIT/C.I.: a quién pertenece ya (null si está libre).</summary>
+    public async Task<ResponseGetObject> CheckTaxId(string? taxId, long? excludePartyId) => new()
+    {
+        Data = new { OwnerName = await PartyChecks.TaxIdOwnerAsync(_unitOfWork, taxId, excludePartyId ?? 0) },
+        Messages = [],
+        StatusCode = HttpStatusCode.OK
+    };
+
+    /// <summary>Al elegir distrito e iglesia de un pastor: qué pastor ya los tiene (null si están libres).</summary>
+    public async Task<ResponseGetObject> CheckPastorSlots(long? districtId, long? churchId, long? excludeClientId) => new()
+    {
+        Data = new
+        {
+            DistrictPastor = await PartyChecks.DistrictPastorAsync(_unitOfWork, districtId, excludeClientId ?? 0),
+            ChurchPastor = await PartyChecks.ChurchPastorAsync(_unitOfWork, churchId, excludeClientId ?? 0)
+        },
+        Messages = [],
+        StatusCode = HttpStatusCode.OK
+    };
 }

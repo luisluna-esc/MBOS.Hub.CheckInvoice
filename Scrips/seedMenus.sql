@@ -176,26 +176,26 @@ ON CONFLICT DO NOTHING;
 -- Historial de Entradas: buscar una nota de ingreso y reimprimirla. Antes era la pantalla de
 -- Entradas; ahora Entradas solo pregunta el motivo (Compras, Transferencias, Devoluciones...).
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Historial de Entradas', 'nav.reportsReceiptHistory', '/reports/receipt-history', NULL, m.menu_id, 1, TRUE, NULL
+SELECT 'Historial de Entradas', 'nav.reportsReceiptHistory', '/reports/receipt-history', NULL, m.menu_id, 6, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 -- Historial de Salidas: igual que el de Entradas; Salidas solo pregunta el tipo de salida.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Historial de Salidas', 'nav.reportsIssueHistory', '/reports/issue-history', NULL, m.menu_id, 1, TRUE, NULL
+SELECT 'Historial de Salidas', 'nav.reportsIssueHistory', '/reports/issue-history', NULL, m.menu_id, 8, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Stock - Almacén', 'nav.reportsStock', '/reports/stock', NULL, m.menu_id, 2, TRUE, NULL
+SELECT 'Stock - Almacén', 'nav.reportsStock', '/reports/stock', NULL, m.menu_id, 1, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Stock - Departamento', 'nav.reportsStockByDepartment', '/reports/stock-by-department', NULL, m.menu_id, 3, TRUE, NULL
+SELECT 'Stock - Departamento', 'nav.reportsStockByDepartment', '/reports/stock-by-department', NULL, m.menu_id, 2, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
@@ -207,13 +207,13 @@ WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Levantamiento de Inventario', 'nav.reportsInventoryCount', '/reports/inventory-count', NULL, m.menu_id, 5, TRUE, NULL
+SELECT 'Levantamiento de Inventario', 'nav.reportsInventoryCount', '/reports/inventory-count', NULL, m.menu_id, 3, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Salidas de Almacén', 'nav.reportsIssues', '/reports/issues', NULL, m.menu_id, 6, TRUE, NULL
+SELECT 'Salidas de Almacén', 'nav.reportsIssues', '/reports/issues', NULL, m.menu_id, 9, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
@@ -225,26 +225,26 @@ WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Kardex por Material', 'nav.reportsKardexByProduct', '/reports/kardex-by-product', NULL, m.menu_id, 8, TRUE, NULL
+SELECT 'Kardex por Material', 'nav.reportsKardexByProduct', '/reports/kardex-by-product', NULL, m.menu_id, 5, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Campo Pastor', 'nav.reportsPastorField', '/reports/pastor-field', NULL, m.menu_id, 9, TRUE, NULL
+SELECT 'Campo Pastor', 'nav.reportsPastorField', '/reports/pastor-field', NULL, m.menu_id, 11, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Transferencias de Almacén', 'nav.reportsTransfers', '/reports/transfers', NULL, m.menu_id, 11, TRUE, NULL
+SELECT 'Transferencias de Almacén', 'nav.reportsTransfers', '/reports/transfers', NULL, m.menu_id, 10, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 -- Reportes / Contabilidad: grupo con los dos reportes para el sistema contable.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Contabilidad', 'nav.reportsAccounting', NULL, NULL, m.menu_id, 12, TRUE, NULL
+SELECT 'Contabilidad', 'nav.reportsAccounting', NULL, NULL, m.menu_id, 13, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
@@ -264,7 +264,7 @@ ON CONFLICT DO NOTHING;
 -- Nombre distinto al de la pantalla de gestión "Cuentas por Cobrar" (movimientos) para que
 -- el filtro por nombre de menu_role no confunda ambos menús.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Cartera de Cuentas por Cobrar', 'nav.reportsAccountReceivables', '/reports/account-receivables', NULL, m.menu_id, 10, TRUE, NULL
+SELECT 'Cartera de Cuentas por Cobrar', 'nav.reportsAccountReceivables', '/reports/account-receivables', NULL, m.menu_id, 12, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;

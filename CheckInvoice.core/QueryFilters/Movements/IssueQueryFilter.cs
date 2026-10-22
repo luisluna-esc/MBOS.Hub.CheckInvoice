@@ -9,4 +9,6 @@ public class IssueQueryFilter
     public long? WarehouseId { get; set; }
     public long? IssueTypeId { get; set; }
     public string? ClientName { get; set; }
+    /// <summary>"updated": con la firma de aprobación del Contador; "outdated": sin ella.</summary>
+    public string? ReviewState { get; set; }
 }

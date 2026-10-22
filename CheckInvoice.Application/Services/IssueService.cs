@@ -68,7 +68,7 @@ public partial class IssueService : IIssueService
             NULL::varchar AS "ReviewStatus",
             NULL::bigint AS "IssueBatchId",
             total_records AS "TotalRecords"
-        FROM sp_get_issues({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::int, {5}::int, {6}::varchar)
+        FROM sp_get_issues({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::int, {5}::int, {6}::varchar, {7}::varchar)
         """;
 
     public async Task<ResponseGetObject> GetAllIssues(PaginationQueryFilter paginationQueryFilter, IssueQueryFilter issueQueryFilter)
@@ -93,7 +93,8 @@ public partial class IssueService : IIssueService
             (object?)issueQueryFilter.IssueTypeId ?? DBNull.Value,
             pageNumber,
             pageSize,
-            (object?)issueQueryFilter.ClientName ?? DBNull.Value);
+            (object?)issueQueryFilter.ClientName ?? DBNull.Value,
+            ReviewStates.ForSql(issueQueryFilter.ReviewState));
 
         var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
 

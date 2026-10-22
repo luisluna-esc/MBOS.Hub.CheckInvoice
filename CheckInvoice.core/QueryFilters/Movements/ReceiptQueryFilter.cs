@@ -10,4 +10,6 @@ public class ReceiptQueryFilter
     public string? SupplierName { get; set; }
     // N° de nota tal como sale impreso: "15-01" o "15-01-2026".
     public string? NoteNumber { get; set; }
+    /// <summary>"updated": con la firma de aprobación del Contador; "outdated": sin ella.</summary>
+    public string? ReviewState { get; set; }
 }

@@ -1,4 +1,5 @@
 using CheckInvoice.Application.Dtos.Parties;
+using CheckInvoice.Application.Services;
 using CheckInvoice.core.Entities.Parties;
 using CheckInvoice.core.Interfaces;
 using FluentValidation;
@@ -40,6 +41,29 @@ public class ClientValidator : AbstractValidator<ClientDto>
             .MustAsync((dto, email, ct) => IsEmailUniqueAsync(unitOfWork, dto.PartyId ?? 0, email, ct))
             .WithMessage("Este correo ya está registrado con otra identidad.")
             .When(x => !string.IsNullOrWhiteSpace(x.Email));
+
+        // Un distrito y una iglesia tienen un solo pastor (el pastor tiene un solo distrito).
+        RuleFor(x => x.DistrictId)
+            .CustomAsync(async (districtId, context, ct) =>
+            {
+                var pastor = await PartyChecks.DistrictPastorAsync(unitOfWork, districtId, context.InstanceToValidate.ClientId);
+                if (pastor is not null)
+                {
+                    context.AddFailure($"Este distrito ya tiene pastor: {pastor}. Un distrito solo puede tener un pastor.");
+                }
+            })
+            .When(x => x.IsPastor && x.DistrictId.HasValue);
+
+        RuleFor(x => x.ChurchId)
+            .CustomAsync(async (churchId, context, ct) =>
+            {
+                var pastor = await PartyChecks.ChurchPastorAsync(unitOfWork, churchId, context.InstanceToValidate.ClientId);
+                if (pastor is not null)
+                {
+                    context.AddFailure($"Esta iglesia ya tiene pastor: {pastor}. Una iglesia solo puede tener un pastor.");
+                }
+            })
+            .When(x => x.IsPastor && x.ChurchId.HasValue);
     }
 
     private static Task<bool> IsTaxIdUniqueAsync(IUnitOfWork unitOfWork, long excludePartyId, string? taxId, CancellationToken ct)

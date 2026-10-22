@@ -91,6 +91,16 @@ public class TransferService : ITransferService
             query = query.Where(t => t.IsApproved == transferQueryFilter.IsApproved.Value);
         }
 
+        // Firma: actualizado = firmado (verificado o aprobado) o anterior a la firma digital.
+        if (transferQueryFilter.ReviewState == ReviewStates.Updated)
+        {
+            query = query.Where(t => ReviewStates.UpdatedStatuses.Contains(t.ReviewStatus));
+        }
+        else if (transferQueryFilter.ReviewState == ReviewStates.Outdated)
+        {
+            query = query.Where(t => !ReviewStates.UpdatedStatuses.Contains(t.ReviewStatus));
+        }
+
         var totalRecords = await query.CountAsync();
 
         var transfers = await query

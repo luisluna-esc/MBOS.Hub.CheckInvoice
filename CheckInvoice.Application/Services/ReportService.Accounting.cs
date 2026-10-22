@@ -34,6 +34,15 @@ public partial class ReportService
         // Las anuladas no cuentan: sus productos volvieron al almacén.
         await LoadIssueNumbersAsync();
         var issues = _unitOfWork.Repository<Issue>().Query().Where(i => !i.IsVoided);
+        // Firma: actualizado = firmado (verificado o aprobado) o anterior a la firma digital.
+        if (filter.ReviewState == ReviewStates.Updated)
+        {
+            issues = issues.Where(i => ReviewStates.UpdatedStatuses.Contains(i.ReviewStatus));
+        }
+        else if (filter.ReviewState == ReviewStates.Outdated)
+        {
+            issues = issues.Where(i => !ReviewStates.UpdatedStatuses.Contains(i.ReviewStatus));
+        }
         if (filter.WarehouseId.HasValue)
         {
             issues = issues.Where(i => i.WarehouseId == filter.WarehouseId.Value);
@@ -100,6 +109,15 @@ public partial class ReportService
     {
         // Las anuladas no cuentan: sus productos ya salieron del inventario.
         var receipts = _unitOfWork.Repository<Receipt>().Query().Where(r => !r.IsVoided);
+        // Firma: actualizado = firmado (verificado o aprobado) o anterior a la firma digital.
+        if (filter.ReviewState == ReviewStates.Updated)
+        {
+            receipts = receipts.Where(r => ReviewStates.UpdatedStatuses.Contains(r.ReviewStatus));
+        }
+        else if (filter.ReviewState == ReviewStates.Outdated)
+        {
+            receipts = receipts.Where(r => !ReviewStates.UpdatedStatuses.Contains(r.ReviewStatus));
+        }
         if (filter.WarehouseId.HasValue)
         {
             receipts = receipts.Where(r => r.WarehouseId == filter.WarehouseId.Value);

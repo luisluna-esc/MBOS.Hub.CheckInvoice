@@ -70,7 +70,7 @@ public partial class ReceiptService : IReceiptService
             NULL::varchar AS "NoteNumber",
             NULL::varchar AS "ReviewStatus",
             total_records AS "TotalRecords"
-        FROM sp_get_receipts({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::varchar, {5}::int, {6}::int, {7}::varchar)
+        FROM sp_get_receipts({0}::bigint, {1}::bigint, {2}::bigint, {3}::bigint, {4}::varchar, {5}::int, {6}::int, {7}::varchar, {8}::varchar)
         """;
 
     public async Task<ResponseGetObject> GetAllReceipts(PaginationQueryFilter paginationQueryFilter, ReceiptQueryFilter receiptQueryFilter)
@@ -96,7 +96,8 @@ public partial class ReceiptService : IReceiptService
             (object?)receiptQueryFilter.InvoiceNumber ?? DBNull.Value,
             pageNumber,
             pageSize,
-            (object?)receiptQueryFilter.SupplierName ?? DBNull.Value);
+            (object?)receiptQueryFilter.SupplierName ?? DBNull.Value,
+            ReviewStates.ForSql(receiptQueryFilter.ReviewState));
 
         var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
 

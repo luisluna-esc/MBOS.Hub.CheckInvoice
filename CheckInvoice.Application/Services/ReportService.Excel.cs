@@ -34,7 +34,8 @@ public partial class ReportService
         var info = new List<string>
         {
             $"Almacén: {await WarehouseNameAsync(filter.WarehouseId)}",
-            $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}"
+            $"Saldo al: {BalanceDateText(filter.DateTo)}",
+            $"Estado: {ReviewStates.Label(filter.ReviewState)}"
         };
         return await BuildWorkbookAsync(wb => AddSheet(wb, "Inventario general", "INVENTARIO GENERAL", info, StockColumns(), rows));
     }
@@ -54,7 +55,8 @@ public partial class ReportService
         {
             $"Almacén: {await WarehouseNameAsync(filter.WarehouseId)}",
             $"Categoría: {departmentName}",
-            $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}"
+            $"Saldo al: {BalanceDateText(filter.DateTo)}",
+            $"Estado: {ReviewStates.Label(filter.ReviewState)}"
         };
         return await BuildWorkbookAsync(wb => AddSheet(wb, "Inventario por departamento", "INVENTARIO POR DEPARTAMENTO", info, StockColumns(), rows));
     }
@@ -65,7 +67,8 @@ public partial class ReportService
         var info = new List<string>
         {
             $"Almacén: {await WarehouseNameAsync(filter.WarehouseId)}",
-            $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}"
+            $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}",
+            $"Estado: {ReviewStates.Label(filter.ReviewState)}"
         };
         var columns = new List<ExcelColumn<KardexReportRowDto>>
         {
@@ -115,7 +118,8 @@ public partial class ReportService
         var info = new List<string>
         {
             $"Almacén: {await WarehouseNameAsync(filter.WarehouseId)}",
-            $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}"
+            $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}",
+            $"Estado: {ReviewStates.Label(filter.ReviewState)}"
         };
         var columns = new List<ExcelColumn<IssuesReportRowDto>>
         {
@@ -140,7 +144,8 @@ public partial class ReportService
         var info = new List<string>
         {
             $"Almacén: {await WarehouseNameAsync(filter.WarehouseId)}",
-            $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}"
+            $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}",
+            $"Estado: {ReviewStates.Label(filter.ReviewState)}"
         };
         var columns = new List<ExcelColumn<ReceiptsReportRowDto>>
         {
@@ -197,7 +202,8 @@ public partial class ReportService
         {
             $"Producto: {(allProducts ? "Todos los productos" : sections.FirstOrDefault()?.ProductLabel ?? "—")}",
             $"Almacén: {await WarehouseNameAsync(filter.WarehouseId)}",
-            $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}"
+            $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}",
+            $"Estado: {ReviewStates.Label(filter.ReviewState)}"
         };
         var columns = new List<ExcelColumn<KardexMovementExcelRow>>();
         // Con todos los productos, cada fila dice de qué producto es (para filtrar en el Excel).

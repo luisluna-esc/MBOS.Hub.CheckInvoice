@@ -1,3 +1,46 @@
+-- Regla de "Actualizado" (select Estado de los reportes): actualizado = la versión vigente ya
+-- tiene firma (verificado o aprobado) o es anterior a la firma digital (ya era oficial antes de
+-- las firmas); desactualizado = digitado o reabierto. Con "Actualizado" los reportes mandan
+-- 'updated' y cuentan solo lo actualizado; con "Desactualizado" mandan NULL y cuentan todo.
+-- Quién puede firmar se controla al firmar, así que aquí basta con el estado.
+DROP FUNCTION IF EXISTS fn_review_matches(VARCHAR, BIGINT, INT, VARCHAR, VARCHAR);
+CREATE OR REPLACE FUNCTION fn_review_matches(p_status VARCHAR, p_state VARCHAR)
+RETURNS BOOLEAN
+LANGUAGE sql
+IMMUTABLE
+AS $$
+    SELECT p_state IS NULL
+        OR (p_state = 'updated' AND p_status IN ('verificado', 'aprobado', 'anterior'))
+        OR (p_state = 'outdated' AND p_status NOT IN ('verificado', 'aprobado', 'anterior'));
+$$;
+
+-- Cantidad de un producto en un almacén hasta una fecha, contando solo los movimientos de ese
+-- estado de firma (lo usa el Levantamiento de Inventario cuando se filtra por firma).
+CREATE OR REPLACE FUNCTION fn_review_quantity(p_product_id BIGINT, p_warehouse_id BIGINT, p_date_to DATE, p_state VARCHAR)
+RETURNS NUMERIC
+LANGUAGE sql
+STABLE
+AS $$
+    SELECT
+        COALESCE((SELECT SUM(rd.quantity) FROM receipt_detail rd JOIN receipt r ON r.receipt_id = rd.receipt_id
+                  WHERE rd.product_id = p_product_id AND NOT r.is_voided AND fn_review_matches(r.review_status, p_state)
+                    AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
+                    AND (p_date_to IS NULL OR r.issue_date < p_date_to + 1)), 0)
+      - COALESCE((SELECT SUM(idt.quantity) FROM issue_detail idt JOIN issue i ON i.issue_id = idt.issue_id
+                  WHERE idt.product_id = p_product_id AND NOT i.is_voided AND fn_review_matches(i.review_status, p_state)
+                    AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
+                    AND (p_date_to IS NULL OR i.issue_date < p_date_to + 1)), 0)
+      + COALESCE((SELECT SUM(td.quantity) FROM transfer_detail td JOIN transfer t ON t.transfer_id = td.transfer_id
+                  WHERE td.product_id = p_product_id AND t.source_warehouse_id IS NOT NULL
+                    AND fn_review_matches(t.review_status, p_state)
+                    AND (p_warehouse_id IS NULL OR t.destination_warehouse_id = p_warehouse_id)
+                    AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)), 0)
+      - COALESCE((SELECT SUM(td.quantity) FROM transfer_detail td JOIN transfer t ON t.transfer_id = td.transfer_id
+                  WHERE td.product_id = p_product_id AND fn_review_matches(t.review_status, p_state)
+                    AND (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
+                    AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)), 0);
+$$;
+
 -- =====================================================================
 -- Procedimientos almacenados
 -- Piloto de rendimiento: reemplaza los múltiples round-trips que
@@ -15,7 +58,8 @@ CREATE OR REPLACE FUNCTION sp_get_issues(
     p_issue_type_id BIGINT,
     p_page_number INT,
     p_page_size INT,
-    p_client_name VARCHAR DEFAULT NULL
+    p_client_name VARCHAR DEFAULT NULL,
+    p_review_state VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     issue_id BIGINT,
@@ -93,6 +137,7 @@ AS $$
       AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
       AND (p_issue_type_id IS NULL OR i.issue_type_id = p_issue_type_id)
       AND (p_client_name IS NULL OR cp.name ILIKE '%' || p_client_name || '%')
+      AND fn_review_matches(i.review_status, p_review_state)
     ORDER BY i.issue_date DESC, i.issue_id DESC
     LIMIT p_page_size OFFSET (p_page_number - 1) * p_page_size;
 $$;
@@ -337,7 +382,8 @@ CREATE OR REPLACE FUNCTION sp_get_receipts(
     p_invoice_number VARCHAR,
     p_page_number INT,
     p_page_size INT,
-    p_supplier_name VARCHAR DEFAULT NULL
+    p_supplier_name VARCHAR DEFAULT NULL,
+    p_review_state VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     receipt_id BIGINT,
@@ -410,6 +456,7 @@ AS $$
       AND (p_receipt_type_id IS NULL OR r.receipt_type_id = p_receipt_type_id)
       AND (p_invoice_number IS NULL OR r.invoice_number = p_invoice_number)
       AND (p_supplier_name IS NULL OR sp.name ILIKE '%' || p_supplier_name || '%')
+      AND fn_review_matches(r.review_status, p_review_state)
     ORDER BY r.issue_date DESC
     LIMIT p_page_size OFFSET (p_page_number - 1) * p_page_size;
 $$;
@@ -663,7 +710,8 @@ $$;
 CREATE OR REPLACE FUNCTION sp_get_stock_report(
     p_warehouse_id BIGINT,
     p_date_from DATE,
-    p_date_to DATE
+    p_date_to DATE,
+    p_review_state VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     product_id BIGINT,
@@ -687,7 +735,7 @@ AS $$
                SUM(rd.quantity * rd.unit_cost) AS cost_total
         FROM receipt_detail rd
         JOIN receipt r ON r.receipt_id = rd.receipt_id
-        WHERE NOT r.is_voided
+        WHERE NOT r.is_voided AND fn_review_matches(r.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR r.issue_date >= p_date_from)
           AND (p_date_to IS NULL OR r.issue_date < p_date_to + 1)
@@ -698,7 +746,7 @@ AS $$
                SUM(idt.quantity) AS qty
         FROM issue_detail idt
         JOIN issue i ON i.issue_id = idt.issue_id
-        WHERE NOT i.is_voided
+        WHERE NOT i.is_voided AND fn_review_matches(i.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR i.issue_date >= p_date_from)
           AND (p_date_to IS NULL OR i.issue_date < p_date_to + 1)
@@ -713,7 +761,8 @@ AS $$
                SUM(td.quantity) AS qty
         FROM transfer_detail td
         JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE t.source_warehouse_id IS NOT NULL
+        WHERE fn_review_matches(t.review_status, p_review_state)
+          AND t.source_warehouse_id IS NOT NULL
           AND (p_warehouse_id IS NULL OR t.destination_warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR t.transfer_date >= p_date_from)
           AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
@@ -724,7 +773,8 @@ AS $$
                SUM(td.quantity) AS qty
         FROM transfer_detail td
         JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
+        WHERE fn_review_matches(t.review_status, p_review_state)
+          AND (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR t.transfer_date >= p_date_from)
           AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
         GROUP BY td.product_id
@@ -762,7 +812,8 @@ CREATE OR REPLACE FUNCTION sp_get_stock_report_by_department(
     p_warehouse_id BIGINT,
     p_department_id BIGINT,
     p_date_from DATE,
-    p_date_to DATE
+    p_date_to DATE,
+    p_review_state VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     product_id BIGINT,
@@ -786,7 +837,7 @@ AS $$
                SUM(rd.quantity * rd.unit_cost) AS cost_total
         FROM receipt_detail rd
         JOIN receipt r ON r.receipt_id = rd.receipt_id
-        WHERE NOT r.is_voided
+        WHERE NOT r.is_voided AND fn_review_matches(r.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR r.issue_date >= p_date_from)
           AND (p_date_to IS NULL OR r.issue_date < p_date_to + 1)
@@ -797,7 +848,7 @@ AS $$
                SUM(idt.quantity) AS qty
         FROM issue_detail idt
         JOIN issue i ON i.issue_id = idt.issue_id
-        WHERE NOT i.is_voided
+        WHERE NOT i.is_voided AND fn_review_matches(i.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR i.issue_date >= p_date_from)
           AND (p_date_to IS NULL OR i.issue_date < p_date_to + 1)
@@ -810,7 +861,8 @@ AS $$
                SUM(td.quantity) AS qty
         FROM transfer_detail td
         JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE t.source_warehouse_id IS NOT NULL
+        WHERE fn_review_matches(t.review_status, p_review_state)
+          AND t.source_warehouse_id IS NOT NULL
           AND (p_warehouse_id IS NULL OR t.destination_warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR t.transfer_date >= p_date_from)
           AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
@@ -821,7 +873,8 @@ AS $$
                SUM(td.quantity) AS qty
         FROM transfer_detail td
         JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
+        WHERE fn_review_matches(t.review_status, p_review_state)
+          AND (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR t.transfer_date >= p_date_from)
           AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
         GROUP BY td.product_id
@@ -867,7 +920,8 @@ $$;
 CREATE OR REPLACE FUNCTION sp_get_kardex_report(
     p_warehouse_id BIGINT,
     p_date_from DATE,
-    p_date_to DATE
+    p_date_to DATE,
+    p_review_state VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     product_id BIGINT,
@@ -891,7 +945,7 @@ AS $$
         SELECT rd.product_id, SUM(rd.quantity) AS qty, SUM(rd.total_cost) AS cost_total
         FROM receipt_detail rd
         JOIN receipt r ON r.receipt_id = rd.receipt_id
-        WHERE NOT r.is_voided
+        WHERE NOT r.is_voided AND fn_review_matches(r.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
           AND p_date_from IS NOT NULL AND r.issue_date < p_date_from
         GROUP BY rd.product_id
@@ -900,7 +954,7 @@ AS $$
         SELECT idt.product_id, SUM(idt.quantity) AS qty, SUM(idt.total_cost) AS cost_total
         FROM issue_detail idt
         JOIN issue i ON i.issue_id = idt.issue_id
-        WHERE NOT i.is_voided
+        WHERE NOT i.is_voided AND fn_review_matches(i.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
           AND p_date_from IS NOT NULL AND i.issue_date < p_date_from
         GROUP BY idt.product_id
@@ -911,7 +965,8 @@ AS $$
         SELECT td.product_id, SUM(td.quantity) AS qty
         FROM transfer_detail td
         JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE t.source_warehouse_id IS NOT NULL
+        WHERE fn_review_matches(t.review_status, p_review_state)
+          AND t.source_warehouse_id IS NOT NULL
           AND (p_warehouse_id IS NULL OR t.destination_warehouse_id = p_warehouse_id)
           AND p_date_from IS NOT NULL AND t.transfer_date < p_date_from
         GROUP BY td.product_id
@@ -920,7 +975,8 @@ AS $$
         SELECT td.product_id, SUM(td.quantity) AS qty
         FROM transfer_detail td
         JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
+        WHERE fn_review_matches(t.review_status, p_review_state)
+          AND (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
           AND p_date_from IS NOT NULL AND t.transfer_date < p_date_from
         GROUP BY td.product_id
     ),
@@ -928,7 +984,7 @@ AS $$
         SELECT rd.product_id, SUM(rd.quantity) AS qty, SUM(rd.total_cost) AS cost_total
         FROM receipt_detail rd
         JOIN receipt r ON r.receipt_id = rd.receipt_id
-        WHERE NOT r.is_voided
+        WHERE NOT r.is_voided AND fn_review_matches(r.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR r.issue_date >= p_date_from)
           AND (p_date_to IS NULL OR r.issue_date < p_date_to + 1)
@@ -938,7 +994,7 @@ AS $$
         SELECT idt.product_id, SUM(idt.quantity) AS qty, SUM(idt.total_cost) AS cost_total
         FROM issue_detail idt
         JOIN issue i ON i.issue_id = idt.issue_id
-        WHERE NOT i.is_voided
+        WHERE NOT i.is_voided AND fn_review_matches(i.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR i.issue_date >= p_date_from)
           AND (p_date_to IS NULL OR i.issue_date < p_date_to + 1)
@@ -950,7 +1006,8 @@ AS $$
         SELECT td.product_id, SUM(td.quantity) AS qty
         FROM transfer_detail td
         JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE t.source_warehouse_id IS NOT NULL
+        WHERE fn_review_matches(t.review_status, p_review_state)
+          AND t.source_warehouse_id IS NOT NULL
           AND (p_warehouse_id IS NULL OR t.destination_warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR t.transfer_date >= p_date_from)
           AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
@@ -960,7 +1017,8 @@ AS $$
         SELECT td.product_id, SUM(td.quantity) AS qty
         FROM transfer_detail td
         JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
+        WHERE fn_review_matches(t.review_status, p_review_state)
+          AND (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
           AND (p_date_from IS NULL OR t.transfer_date >= p_date_from)
           AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
         GROUP BY td.product_id
@@ -1026,7 +1084,8 @@ $$;
 CREATE OR REPLACE FUNCTION sp_get_inventory_count_report(
     p_warehouse_id BIGINT,
     p_date_from DATE,
-    p_date_to DATE
+    p_date_to DATE,
+    p_review_state VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     product_id BIGINT,
@@ -1069,13 +1128,19 @@ AS $$
         d.name AS department_name,
         p.sub_department_id,
         sd.name AS sub_department_name,
-        icd.system_quantity AS quantity,
+        q.quantity,
         icd.unit_value,
-        (icd.system_quantity * COALESCE(icd.unit_value, 0)) AS total_value,
+        (q.quantity * COALESCE(icd.unit_value, 0)) AS total_value,
         icd.physical_quantity,
-        icd.difference
+        CASE WHEN p_review_state IS NULL THEN icd.difference
+             ELSE COALESCE(icd.physical_quantity, 0) - q.quantity END AS difference
     FROM inventory_count_detail icd
     JOIN visible_counts vc ON vc.inventory_count_id = icd.inventory_count_id
+    JOIN inventory_count ic ON ic.inventory_count_id = icd.inventory_count_id
+    CROSS JOIN LATERAL (
+        SELECT CASE WHEN p_review_state IS NULL THEN icd.system_quantity
+                    ELSE fn_review_quantity(icd.product_id, ic.warehouse_id, ic.end_date::date, p_review_state) END AS quantity
+    ) q
     JOIN product p ON p.product_id = icd.product_id
     LEFT JOIN department d ON d.department_id = p.department_id
     LEFT JOIN sub_department sd ON sd.sub_department_id = p.sub_department_id
@@ -1089,7 +1154,8 @@ $$;
 CREATE OR REPLACE FUNCTION sp_get_issues_report(
     p_warehouse_id BIGINT,
     p_date_from DATE,
-    p_date_to DATE
+    p_date_to DATE,
+    p_review_state VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     issue_id BIGINT,
@@ -1127,7 +1193,7 @@ AS $$
     LEFT JOIN department d ON d.department_id = p.department_id
     LEFT JOIN sub_department sd ON sd.sub_department_id = p.sub_department_id
     LEFT JOIN media_type mt ON mt.media_type_id = p.media_type_id
-    WHERE NOT i.is_voided
+    WHERE NOT i.is_voided AND fn_review_matches(i.review_status, p_review_state)
       AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
       AND (p_date_from IS NULL OR i.issue_date >= p_date_from)
       AND (p_date_to IS NULL OR i.issue_date < p_date_to + 1)
@@ -1141,7 +1207,8 @@ $$;
 CREATE OR REPLACE FUNCTION sp_get_receipts_report(
     p_warehouse_id BIGINT,
     p_date_from DATE,
-    p_date_to DATE
+    p_date_to DATE,
+    p_review_state VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     receipt_id BIGINT,
@@ -1181,7 +1248,7 @@ AS $$
     LEFT JOIN department d ON d.department_id = p.department_id
     LEFT JOIN sub_department sd ON sd.sub_department_id = p.sub_department_id
     LEFT JOIN media_type mt ON mt.media_type_id = p.media_type_id
-    WHERE NOT r.is_voided
+    WHERE NOT r.is_voided AND fn_review_matches(r.review_status, p_review_state)
       AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
       AND (p_date_from IS NULL OR r.issue_date >= p_date_from)
       AND (p_date_to IS NULL OR r.issue_date < p_date_to + 1)
@@ -1306,7 +1373,8 @@ CREATE OR REPLACE FUNCTION sp_get_kardex_by_product_report(
     p_product_id BIGINT,
     p_warehouse_id BIGINT,
     p_date_from DATE,
-    p_date_to DATE
+    p_date_to DATE,
+    p_review_state VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     movement_type VARCHAR,
@@ -1327,7 +1395,7 @@ AS $$
         FROM receipt_detail rd
         JOIN receipt r ON r.receipt_id = rd.receipt_id
         WHERE rd.product_id = p_product_id
-          AND NOT r.is_voided
+          AND NOT r.is_voided AND fn_review_matches(r.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
         UNION ALL
         SELECT 'issue' AS movement_type, i.issue_id AS voucher_id, i.issue_date AS voucher_date,
@@ -1335,7 +1403,7 @@ AS $$
         FROM issue_detail idt
         JOIN issue i ON i.issue_id = idt.issue_id
         WHERE idt.product_id = p_product_id
-          AND NOT i.is_voided
+          AND NOT i.is_voided AND fn_review_matches(i.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
     ),
     running AS (
@@ -1363,7 +1431,8 @@ $$;
 CREATE OR REPLACE FUNCTION sp_get_kardex_by_product_opening_balance(
     p_product_id BIGINT,
     p_warehouse_id BIGINT,
-    p_date_from DATE
+    p_date_from DATE,
+    p_review_state VARCHAR DEFAULT NULL
 )
 RETURNS TABLE (
     opening_quantity NUMERIC,
@@ -1377,7 +1446,7 @@ AS $$
         FROM receipt_detail rd
         JOIN receipt r ON r.receipt_id = rd.receipt_id
         WHERE rd.product_id = p_product_id
-          AND NOT r.is_voided
+          AND NOT r.is_voided AND fn_review_matches(r.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
           AND p_date_from IS NOT NULL AND r.issue_date < p_date_from
     ),
@@ -1386,7 +1455,7 @@ AS $$
         FROM issue_detail idt
         JOIN issue i ON i.issue_id = idt.issue_id
         WHERE idt.product_id = p_product_id
-          AND NOT i.is_voided
+          AND NOT i.is_voided AND fn_review_matches(i.review_status, p_review_state)
           AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
           AND p_date_from IS NOT NULL AND i.issue_date < p_date_from
     )

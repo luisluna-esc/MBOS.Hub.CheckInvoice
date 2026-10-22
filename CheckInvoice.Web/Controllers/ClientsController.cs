@@ -26,6 +26,24 @@ public class ClientsController : ControllerBase
         return StatusCode((int)result.StatusCode, result);
     }
 
+    // NIT/C.I. ya registrado: lo consultan los formularios de Cliente, Pastor y Proveedor mientras
+    // se escribe. Solo pide sesión (el de Proveedor no siempre tiene permiso de clientes).
+    [Authorize]
+    [HttpGet("tax-id-check")]
+    public async Task<IActionResult> CheckTaxId([FromQuery] string? taxId, [FromQuery] long? excludePartyId)
+    {
+        var result = await _clientService.CheckTaxId(taxId, excludePartyId);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [Authorize(Policy = "client.view")]
+    [HttpGet("pastor-check")]
+    public async Task<IActionResult> CheckPastorSlots([FromQuery] long? districtId, [FromQuery] long? churchId, [FromQuery] long? excludeClientId)
+    {
+        var result = await _clientService.CheckPastorSlots(districtId, churchId, excludeClientId);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
     [Authorize(Policy = "client.manage")]
     [HttpPost]
     public async Task<IActionResult> Insert([FromBody] ClientDto clientDto)

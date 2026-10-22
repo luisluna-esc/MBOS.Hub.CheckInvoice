@@ -68,16 +68,22 @@ public partial class ReportService : IReportService
             net_quantity AS "NetQuantity",
             unit_value AS "UnitValue",
             total_value AS "TotalValue"
-        FROM sp_get_stock_report({0}::bigint, {1}::date, {2}::date)
+        FROM sp_get_stock_report({0}::bigint, {1}::date, {2}::date, {3}::varchar)
         """;
+
+    // Saldos (Inventario General, por Departamento y Plantilla de conteo): todo lo movido hasta la
+    // fecha, sin fecha de inicio (con fecha de inicio salía solo el movimiento del periodo).
+    // Con Estado "Actualizado" cuenta solo lo actualizado; con "Desactualizado", todo.
+    private static string BalanceDateText(DateOnly? dateTo) => dateTo?.ToString("dd/MM/yyyy") ?? "Hoy";
 
     public async Task<List<StockReportRowDto>> GetStockReport(StockReportQueryFilter filter)
     {
         return await _unitOfWork.SqlQueryAsync<StockReportRowDto>(
             GetStockReportSql,
             (object?)filter.WarehouseId ?? DBNull.Value,
-            (object?)filter.DateFrom ?? DBNull.Value,
-            (object?)filter.DateTo ?? DBNull.Value);
+            DBNull.Value,
+            (object?)filter.DateTo ?? DBNull.Value,
+            ReviewStates.ForSql(filter.ReviewState));
     }
 
     public async Task<byte[]> GenerateStockReportPdf(StockReportQueryFilter filter)
@@ -100,13 +106,7 @@ public partial class ReportService : IReportService
             username = user?.Username ?? username;
         }
 
-        var periodText = (filter.DateFrom, filter.DateTo) switch
-        {
-            (not null, not null) => $"{filter.DateFrom:dd/MM/yyyy} al {filter.DateTo:dd/MM/yyyy}",
-            (not null, null) => $"Desde {filter.DateFrom:dd/MM/yyyy}",
-            (null, not null) => $"Hasta {filter.DateTo:dd/MM/yyyy}",
-            _ => "Todo el historial"
-        };
+        var balanceDate = BalanceDateText(filter.DateTo);
 
         var groups = rows
             .GroupBy(r => r.DepartmentName ?? "(Sin categoría)")
@@ -128,7 +128,7 @@ public partial class ReportService : IReportService
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(9));
 
-                page.Header().Element(c => ReportHeader(c, "Inventario General", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
+                page.Header().Element(c => ReportHeader(c, "Inventario General", $"Almacén: {warehouseName}", $"Saldo al: {balanceDate}", $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -220,13 +220,7 @@ public partial class ReportService : IReportService
             username = user?.Username ?? username;
         }
 
-        var periodText = (filter.DateFrom, filter.DateTo) switch
-        {
-            (not null, not null) => $"{filter.DateFrom:dd/MM/yyyy} al {filter.DateTo:dd/MM/yyyy}",
-            (not null, null) => $"Desde {filter.DateFrom:dd/MM/yyyy}",
-            (null, not null) => $"Hasta {filter.DateTo:dd/MM/yyyy}",
-            _ => "Todo el historial"
-        };
+        var balanceDate = BalanceDateText(filter.DateTo);
 
         var groups = rows
             .GroupBy(r => r.DepartmentName ?? "(Sin categoría)")
@@ -248,7 +242,7 @@ public partial class ReportService : IReportService
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(7));
 
-                page.Header().Element(c => ReportHeader(c, "Plantilla de Conteo Físico", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
+                page.Header().Element(c => ReportHeader(c, "Plantilla de Conteo Físico", $"Almacén: {warehouseName}", $"Saldo al: {balanceDate}", $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -347,7 +341,7 @@ public partial class ReportService : IReportService
             net_quantity AS "NetQuantity",
             unit_value AS "UnitValue",
             total_value AS "TotalValue"
-        FROM sp_get_stock_report_by_department({0}::bigint, {1}::bigint, {2}::date, {3}::date)
+        FROM sp_get_stock_report_by_department({0}::bigint, {1}::bigint, {2}::date, {3}::date, {4}::varchar)
         """;
 
     public async Task<List<StockReportRowDto>> GetStockByDepartmentReport(StockByDepartmentReportQueryFilter filter)
@@ -356,8 +350,9 @@ public partial class ReportService : IReportService
             GetStockByDepartmentReportSql,
             (object?)filter.WarehouseId ?? DBNull.Value,
             (object?)filter.DepartmentId ?? DBNull.Value,
-            (object?)filter.DateFrom ?? DBNull.Value,
-            (object?)filter.DateTo ?? DBNull.Value);
+            DBNull.Value,
+            (object?)filter.DateTo ?? DBNull.Value,
+            ReviewStates.ForSql(filter.ReviewState));
     }
 
     public async Task<byte[]> GenerateStockByDepartmentReportPdf(StockByDepartmentReportQueryFilter filter)
@@ -387,13 +382,7 @@ public partial class ReportService : IReportService
             username = user?.Username ?? username;
         }
 
-        var periodText = (filter.DateFrom, filter.DateTo) switch
-        {
-            (not null, not null) => $"{filter.DateFrom:dd/MM/yyyy} al {filter.DateTo:dd/MM/yyyy}",
-            (not null, null) => $"Desde {filter.DateFrom:dd/MM/yyyy}",
-            (null, not null) => $"Hasta {filter.DateTo:dd/MM/yyyy}",
-            _ => "Todo el historial"
-        };
+        var balanceDate = BalanceDateText(filter.DateTo);
 
         var groups = rows
             .GroupBy(r => r.SubDepartmentName ?? "(Sin subcategoría)")
@@ -408,7 +397,7 @@ public partial class ReportService : IReportService
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(9));
 
-                page.Header().Element(c => ReportHeader(c, "Inventario por Departamento", $"Almacén: {warehouseName}", $"Categoría: {departmentName}", $"Periodo: {periodText}"));
+                page.Header().Element(c => ReportHeader(c, "Inventario por Departamento", $"Almacén: {warehouseName}", $"Categoría: {departmentName}", $"Saldo al: {balanceDate}", $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -484,7 +473,7 @@ public partial class ReportService : IReportService
             issues_value AS "IssuesValue",
             closing_quantity AS "ClosingQuantity",
             closing_value AS "ClosingValue"
-        FROM sp_get_kardex_report({0}::bigint, {1}::date, {2}::date)
+        FROM sp_get_kardex_report({0}::bigint, {1}::date, {2}::date, {3}::varchar)
         """;
 
     public async Task<List<KardexReportRowDto>> GetKardexReport(KardexReportQueryFilter filter)
@@ -493,7 +482,8 @@ public partial class ReportService : IReportService
             GetKardexReportSql,
             (object?)filter.WarehouseId ?? DBNull.Value,
             (object?)filter.DateFrom ?? DBNull.Value,
-            (object?)filter.DateTo ?? DBNull.Value);
+            (object?)filter.DateTo ?? DBNull.Value,
+            ReviewStates.ForSql(filter.ReviewState));
     }
 
     public async Task<byte[]> GenerateKardexReportPdf(KardexReportQueryFilter filter)
@@ -537,7 +527,7 @@ public partial class ReportService : IReportService
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(8));
 
-                page.Header().Element(c => ReportHeader(c, "Kardex Físico Valorado", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
+                page.Header().Element(c => ReportHeader(c, "Kardex Físico Valorado", $"Almacén: {warehouseName}", $"Periodo: {periodText}", $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -654,7 +644,7 @@ public partial class ReportService : IReportService
             total_value AS "TotalValue",
             physical_quantity AS "PhysicalQuantity",
             difference AS "Difference"
-        FROM sp_get_inventory_count_report({0}::bigint, {1}::date, {2}::date)
+        FROM sp_get_inventory_count_report({0}::bigint, {1}::date, {2}::date, {3}::varchar)
         """;
 
     public async Task<List<InventoryCountReportRowDto>> GetInventoryCountReport(InventoryCountReportQueryFilter filter)
@@ -663,7 +653,8 @@ public partial class ReportService : IReportService
             GetInventoryCountReportSql,
             (object?)filter.WarehouseId ?? DBNull.Value,
             (object?)filter.DateFrom ?? DBNull.Value,
-            (object?)filter.DateTo ?? DBNull.Value);
+            (object?)filter.DateTo ?? DBNull.Value,
+            DBNull.Value);
     }
 
     public async Task<byte[]> GenerateInventoryCountReportPdf(InventoryCountReportQueryFilter filter)
@@ -816,7 +807,7 @@ public partial class ReportService : IReportService
             quantity AS "Quantity",
             unit_cost AS "UnitCost",
             total_cost AS "TotalCost"
-        FROM sp_get_issues_report({0}::bigint, {1}::date, {2}::date)
+        FROM sp_get_issues_report({0}::bigint, {1}::date, {2}::date, {3}::varchar)
         """;
 
     public async Task<List<IssuesReportRowDto>> GetIssuesReport(IssuesReportQueryFilter filter)
@@ -826,7 +817,8 @@ public partial class ReportService : IReportService
             GetIssuesReportSql,
             (object?)filter.WarehouseId ?? DBNull.Value,
             (object?)filter.DateFrom ?? DBNull.Value,
-            (object?)filter.DateTo ?? DBNull.Value);
+            (object?)filter.DateTo ?? DBNull.Value,
+            ReviewStates.ForSql(filter.ReviewState));
     }
 
     public async Task<byte[]> GenerateIssuesReportPdf(IssuesReportQueryFilter filter)
@@ -877,7 +869,7 @@ public partial class ReportService : IReportService
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(7));
 
-                page.Header().Element(c => ReportHeader(c, "Salidas de Almacén", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
+                page.Header().Element(c => ReportHeader(c, "Salidas de Almacén", $"Almacén: {warehouseName}", $"Periodo: {periodText}", $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -969,7 +961,7 @@ public partial class ReportService : IReportService
             quantity AS "Quantity",
             unit_cost AS "UnitCost",
             total_cost AS "TotalCost"
-        FROM sp_get_receipts_report({0}::bigint, {1}::date, {2}::date)
+        FROM sp_get_receipts_report({0}::bigint, {1}::date, {2}::date, {3}::varchar)
         """;
 
     public async Task<List<ReceiptsReportRowDto>> GetReceiptsReport(ReceiptsReportQueryFilter filter)
@@ -978,7 +970,8 @@ public partial class ReportService : IReportService
             GetReceiptsReportSql,
             (object?)filter.WarehouseId ?? DBNull.Value,
             (object?)filter.DateFrom ?? DBNull.Value,
-            (object?)filter.DateTo ?? DBNull.Value);
+            (object?)filter.DateTo ?? DBNull.Value,
+            ReviewStates.ForSql(filter.ReviewState));
     }
 
     public async Task<byte[]> GenerateReceiptsReportPdf(ReceiptsReportQueryFilter filter)
@@ -1030,7 +1023,7 @@ public partial class ReportService : IReportService
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(7));
 
-                page.Header().Element(c => ReportHeader(c, "Ingresos de Almacén", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
+                page.Header().Element(c => ReportHeader(c, "Ingresos de Almacén", $"Almacén: {warehouseName}", $"Periodo: {periodText}", $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -1599,7 +1592,7 @@ public partial class ReportService : IReportService
             total_cost AS "TotalCost",
             balance_quantity AS "BalanceQuantity",
             balance_value AS "BalanceValue"
-        FROM sp_get_kardex_by_product_report({0}::bigint, {1}::bigint, {2}::date, {3}::date)
+        FROM sp_get_kardex_by_product_report({0}::bigint, {1}::bigint, {2}::date, {3}::date, {4}::varchar)
         """;
 
     public async Task<List<KardexByProductReportRowDto>> GetKardexByProductReport(KardexByProductReportQueryFilter filter)
@@ -1614,7 +1607,8 @@ public partial class ReportService : IReportService
             productId,
             filter.WarehouseId,
             (object?)filter.DateFrom ?? DBNull.Value,
-            (object?)filter.DateTo ?? DBNull.Value);
+            (object?)filter.DateTo ?? DBNull.Value,
+            ReviewStates.ForSql(filter.ReviewState));
 
     // Un bloque del kardex por material: el producto, su saldo inicial y sus movimientos.
     private sealed record KardexByProductSection(
@@ -1640,7 +1634,7 @@ public partial class ReportService : IReportService
         foreach (var product in products)
         {
             var rows = await GetKardexByProductRows(product.ProductId, filter);
-            var opening = await GetKardexByProductOpeningBalance(product.ProductId, filter.WarehouseId, filter.DateFrom);
+            var opening = await GetKardexByProductOpeningBalance(product.ProductId, filter.WarehouseId, filter.DateFrom, filter.ReviewState);
             if (!filter.ProductId.HasValue && rows.Count == 0 && opening.OpeningQuantity == 0)
             {
                 continue;
@@ -1665,17 +1659,18 @@ public partial class ReportService : IReportService
         SELECT
             opening_quantity AS "OpeningQuantity",
             opening_value AS "OpeningValue"
-        FROM sp_get_kardex_by_product_opening_balance({0}::bigint, {1}::bigint, {2}::date)
+        FROM sp_get_kardex_by_product_opening_balance({0}::bigint, {1}::bigint, {2}::date, {3}::varchar)
         """;
 
     private async Task<KardexByProductOpeningBalanceDto> GetKardexByProductOpeningBalance(
-        long productId, long warehouseId, DateOnly? dateFrom)
+        long productId, long warehouseId, DateOnly? dateFrom, string? reviewState)
     {
         var rows = await _unitOfWork.SqlQueryAsync<KardexByProductOpeningBalanceDto>(
             GetKardexByProductOpeningBalanceSql,
             productId,
             warehouseId,
-            (object?)dateFrom ?? DBNull.Value);
+            (object?)dateFrom ?? DBNull.Value,
+            ReviewStates.ForSql(reviewState));
         return rows.FirstOrDefault() ?? new KardexByProductOpeningBalanceDto();
     }
 
@@ -1714,7 +1709,7 @@ public partial class ReportService : IReportService
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(8));
 
-                page.Header().Element(c => ReportHeader(c, "Kardex por Material", $"Producto: {productLabel}", $"Almacén: {warehouseName}", $"Periodo: {periodText}"));
+                page.Header().Element(c => ReportHeader(c, "Kardex por Material", $"Producto: {productLabel}", $"Almacén: {warehouseName}", $"Periodo: {periodText}", $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {

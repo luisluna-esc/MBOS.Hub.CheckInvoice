@@ -13,4 +13,6 @@ public interface IClientService
     Task<ResponsePost> DeleteClient(long id);
     Task<ResponseGetObject> GrantPortalAccess(long id);
     Task<ResponseGetObject> ResetPortalPassword(long id);
+    Task<ResponseGetObject> CheckTaxId(string? taxId, long? excludePartyId);
+    Task<ResponseGetObject> CheckPastorSlots(long? districtId, long? churchId, long? excludeClientId);
 }

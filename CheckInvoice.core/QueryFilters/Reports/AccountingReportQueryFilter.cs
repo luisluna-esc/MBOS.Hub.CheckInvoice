@@ -7,4 +7,6 @@ public class AccountingReportQueryFilter
     public DateOnly? DateTo { get; set; }
     /// <summary>Solo en entradas: compras, donaciones, devoluciones, ajustes...</summary>
     public long? ReceiptTypeId { get; set; }
+    /// <summary>"updated" (verificado o aprobado) u "outdated" (sin verificar).</summary>
+    public string? ReviewState { get; set; }
 }

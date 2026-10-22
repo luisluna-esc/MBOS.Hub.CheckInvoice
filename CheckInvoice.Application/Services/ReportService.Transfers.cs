@@ -27,6 +27,15 @@ public partial class ReportService
         {
             transfers = transfers.Where(t => t.DestinationWarehouseId == filter.DestinationWarehouseId.Value);
         }
+        // Firma: actualizado = firmado (verificado o aprobado) o anterior a la firma digital.
+        if (filter.ReviewState == ReviewStates.Updated)
+        {
+            transfers = transfers.Where(t => ReviewStates.UpdatedStatuses.Contains(t.ReviewStatus));
+        }
+        else if (filter.ReviewState == ReviewStates.Outdated)
+        {
+            transfers = transfers.Where(t => !ReviewStates.UpdatedStatuses.Contains(t.ReviewStatus));
+        }
 
         // TransferDate es un instante en UTC: el rango de días se arma en hora de Bolivia (UTC-4).
         if (filter.DateFrom.HasValue)
@@ -79,7 +88,8 @@ public partial class ReportService
     [
         $"Origen: {await WarehouseNameAsync(filter.SourceWarehouseId)}",
         $"Destino: {await WarehouseNameAsync(filter.DestinationWarehouseId)}",
-        $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}"
+        $"Periodo: {PeriodText(filter.DateFrom, filter.DateTo)}",
+        $"Estado: {ReviewStates.Label(filter.ReviewState)}"
     ];
 
     public async Task<byte[]> GenerateTransfersReportPdf(TransfersReportQueryFilter filter)

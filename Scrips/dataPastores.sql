@@ -6,9 +6,13 @@
 --
 -- 1. Distritos con nombre viejo en el sistema: se renombran al nombre actual (conservan sus
 --    iglesias). 2. Distritos que faltan: se crean. 3. Cada pastor: si ya existe (por C.I. o, si
---    no, por nombre) se actualiza su C.I. y su distrito con los de la planilla y queda marcado
---    como pastor activo; si no existe, se crea.
+--    no, por nombre) se actualiza su nombre, C.I. y distrito con los de la planilla y queda
+--    marcado como pastor activo; si no existe, se crea. Los nombres van con los apellidos
+--    primero ("Tarqui Huanca Isaac"), igual en todo el sistema.
 -- =====================================================================================
+
+-- El archivo está en UTF-8 (nombres con ñ y acentos), sin importar la consola que lo corra.
+SET client_encoding = 'UTF8';
 
 BEGIN;
 
@@ -36,47 +40,47 @@ WHERE NOT EXISTS (SELECT 1 FROM district x WHERE lower(x.district_name) = lower(
 -- 3. Pastores.
 CREATE TEMP TABLE tmp_pastor (n INT, name VARCHAR(150), tax_id VARCHAR(20), district VARCHAR(100)) ON COMMIT DROP;
 INSERT INTO tmp_pastor (n, name, tax_id, district) VALUES
-    (1, 'Isaac Tarqui Huanca', '6875340', '25 de Julio'),
-    (2, 'Hugo Apaza Quiñones', '6915986', '27 de Mayo'),
-    (3, 'Edwin Surco Yupanqui', '4514588', '27 de Septiembre'),
-    (4, 'Juan Milton Sirpa Alcon', '12449941', 'Araca'),
-    (5, 'Luis Alfredo Poma Perez', '7043523', 'Aroma'),
-    (6, 'Miguel Angel Bautista Calle', '7020616', 'Atipiris'),
-    (7, 'Henry Wilson Coronel Laime', '4800042', 'Bolivar'),
-    (8, 'Roly Callisaya Chinahuanca', '7037306', 'Cajuata'),
-    (9, 'Efrain Tarqui Chura', '9239792', 'Charapaqui'),
-    (10, 'Absalon Eleazar Valeriano Condori', '13440376', 'Collana'),
-    (11, 'Nelo Franklin Quiuchaca Apaza', '8439312', 'Cosapa'),
-    (12, 'Noel Larico Aruquipa', '6188628', 'Cosmos'),
-    (13, 'John Chino Chipana', '3424647', 'Cupilupaca'),
-    (14, 'Alvaro Gabriel Condori Canaviri', '6853028', 'Curahuara'),
-    (15, 'Mario Alejandro Pomacusi Cari', '8354769', 'El Porvenir'),
-    (16, 'Ever Pairo Mamani', '10062204', 'El Salvador'),
-    (17, 'Omar Llanos Cohaila', '8304655', 'El Valle'),
-    (18, 'Mequias Pari Tipo', '6178853', 'Fabril'),
-    (19, 'Sergio Mamani Mamani', '7005521', 'Inquisivi'),
-    (20, 'Ronald Moya Condori', '6955431', 'La Hermosa'),
-    (21, 'Juan Eusebio Quispe Espinoza', '7055964', 'Lahuachaca'),
-    (22, 'Josué Quispe Sánchez', '8404262', 'Las Fronteras'),
-    (23, 'Mario Carlos Pinto Salvatierra', '5033881', 'Maranatha'),
-    (24, 'Juan Luis Quipildor Tito', '2621402', 'Mariscal'),
-    (25, 'Emmanuel Aguilar Conde', '10387002', 'Muruamaya'),
-    (26, 'Fidel John Mamani Limachi', '3478403', 'Pacajes'),
-    (27, 'Juan Carlos Lima Huanca', '4834871', 'Patacamaya'),
-    (28, 'Robie Chuquimia Lucana', '10805636', 'Pathipi'),
-    (29, 'David Sajama Sanchez', '7278224', 'Rosario'),
-    (30, 'Fidel Aliaga Quispe', '4843050', 'San Martín'),
-    (31, 'Franz Ciro Valdez Laura', '3461744', 'Santa Rosa'),
-    (32, 'Mauro Chipana Serrano', '6089115', 'Santiago de Machaca'),
-    (33, 'Edson Plinio Llusco Chávez', '6890587', 'Senkata 79'),
-    (34, 'Rubén Chambilla Esprella', '6768769', 'Tilata'),
-    (35, 'Percy Tarquiola Coria', '7080473', 'Ventilla'),
-    (36, 'Jose Edwin Escarzo Nina', '4046655', 'Viacha'),
-    (37, 'Benjamin Josue Mena Laura', '6858984', 'Vichaya'),
-    (38, 'David Gutiérrez Limachi', '4774964', 'Villa Adela'),
-    (39, 'Adhemar Llanos Cohaila', '12955578', 'Villa Aroma'),
-    (40, 'Manuel Huascar Morante Kondory', '3434083', 'Villa Juliana'),
-    (41, 'Wilmer Elio Chambi Catunta', '9963954', 'Villa Remedios');
+    (1, 'Tarqui Huanca Isaac', '6875340', '25 de Julio'),
+    (2, 'Apaza Quiñones Hugo', '6915986', '27 de Mayo'),
+    (3, 'Surco Yupanqui Edwin', '4514588', '27 de Septiembre'),
+    (4, 'Sirpa Alcon Juan Milton', '12449941', 'Araca'),
+    (5, 'Poma Perez Luis Alfredo', '7043523', 'Aroma'),
+    (6, 'Bautista Calle Miguel Angel', '7020616', 'Atipiris'),
+    (7, 'Coronel Laime Henry Wilson', '4800042', 'Bolivar'),
+    (8, 'Callisaya Chinahuanca Roly', '7037306', 'Cajuata'),
+    (9, 'Tarqui Chura Efrain', '9239792', 'Charapaqui'),
+    (10, 'Valeriano Condori Absalon Eleazar', '13440376', 'Collana'),
+    (11, 'Quiuchaca Apaza Nelo Franklin', '8439312', 'Cosapa'),
+    (12, 'Larico Aruquipa Noel', '6188628', 'Cosmos'),
+    (13, 'Chino Chipana John', '3424647', 'Cupilupaca'),
+    (14, 'Condori Canaviri Alvaro Gabriel', '6853028', 'Curahuara'),
+    (15, 'Pomacusi Cari Mario Alejandro', '8354769', 'El Porvenir'),
+    (16, 'Pairo Mamani Ever', '10062204', 'El Salvador'),
+    (17, 'Llanos Cohaila Omar', '8304655', 'El Valle'),
+    (18, 'Pari Tipo Mequias', '6178853', 'Fabril'),
+    (19, 'Mamani Mamani Sergio', '7005521', 'Inquisivi'),
+    (20, 'Moya Condori Ronald', '6955431', 'La Hermosa'),
+    (21, 'Quispe Espinoza Juan Eusebio', '7055964', 'Lahuachaca'),
+    (22, 'Quispe Sánchez Josué', '8404262', 'Las Fronteras'),
+    (23, 'Pinto Salvatierra Mario Carlos', '5033881', 'Maranatha'),
+    (24, 'Quipildor Tito Juan Luis', '2621402', 'Mariscal'),
+    (25, 'Aguilar Conde Emmanuel', '10387002', 'Muruamaya'),
+    (26, 'Mamani Limachi Fidel John', '3478403', 'Pacajes'),
+    (27, 'Lima Huanca Juan Carlos', '4834871', 'Patacamaya'),
+    (28, 'Chuquimia Lucana Robie', '10805636', 'Pathipi'),
+    (29, 'Sajama Sanchez David', '7278224', 'Rosario'),
+    (30, 'Aliaga Quispe Fidel', '4843050', 'San Martín'),
+    (31, 'Valdez Laura Franz Ciro', '3461744', 'Santa Rosa'),
+    (32, 'Chipana Serrano Mauro', '6089115', 'Santiago de Machaca'),
+    (33, 'Llusco Chávez Edson Plinio', '6890587', 'Senkata 79'),
+    (34, 'Chambilla Esprella Rubén', '6768769', 'Tilata'),
+    (35, 'Tarquiola Coria Percy', '7080473', 'Ventilla'),
+    (36, 'Escarzo Nina Jose Edwin', '4046655', 'Viacha'),
+    (37, 'Mena Laura Benjamin Josue', '6858984', 'Vichaya'),
+    (38, 'Gutiérrez Limachi David', '4774964', 'Villa Adela'),
+    (39, 'Llanos Cohaila Adhemar', '12955578', 'Villa Aroma'),
+    (40, 'Morante Kondory Manuel Huascar', '3434083', 'Villa Juliana'),
+    (41, 'Chambi Catunta Wilmer Elio', '9963954', 'Villa Remedios');
 
 CREATE TEMP TABLE tmp_result (n INT, name VARCHAR(150), action TEXT) ON COMMIT DROP;
 
@@ -114,7 +118,7 @@ BEGIN
             VALUES (v_party, v_doc, v_district, TRUE, TRUE);
             INSERT INTO tmp_result VALUES (p.n, p.name, 'creado');
         ELSE
-            UPDATE party SET tax_id = p.tax_id WHERE party_id = v_party;
+            UPDATE party SET tax_id = p.tax_id, name = trim(p.name) WHERE party_id = v_party;
             SELECT client_id INTO v_client FROM client WHERE party_id = v_party;
             IF v_client IS NULL THEN
                 INSERT INTO client (party_id, document_type_id, district_id, is_active, is_pastor)
