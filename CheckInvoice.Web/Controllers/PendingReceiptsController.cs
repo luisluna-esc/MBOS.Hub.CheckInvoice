@@ -39,6 +39,15 @@ public class PendingReceiptsController : ControllerBase
         return File(bytes, "application/pdf", "ingresos-pendientes-de-factura.pdf");
     }
 
+    // Formulario de Recepción de una nota (como la planilla de Excel que usaban).
+    [Authorize(Policy = "receipt.view")]
+    [HttpGet("{id:long}/pdf")]
+    public async Task<IActionResult> GetNotePdf(long id)
+    {
+        var bytes = await _reportService.GeneratePendingReceiptNotePdf(id);
+        return bytes is null ? NotFound() : File(bytes, "application/pdf", $"formulario-recepcion-{id}.pdf");
+    }
+
     [Authorize(Policy = "receipt.view")]
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetById(long id)
