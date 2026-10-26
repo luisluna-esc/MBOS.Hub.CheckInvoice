@@ -1,3 +1,4 @@
+using CheckInvoice.core.QueryFilters.Movements;
 using CheckInvoice.Application.Dtos.Reports;
 using CheckInvoice.core.QueryFilters.Reports;
 
@@ -33,6 +34,7 @@ public interface IReportService
     Task<List<AccountingEntryRowDto>> GetIssuesAccountingReport(AccountingReportQueryFilter filter);
     Task<byte[]> GenerateIssuesAccountingExcel(AccountingReportQueryFilter filter);
     Task<byte[]?> GenerateIssueBatchPdf(long issueBatchId);
+    Task<byte[]> GeneratePendingReceiptsPdf(PendingReceiptQueryFilter filter);
     Task<List<AccountingEntryRowDto>> GetReceiptsAccountingReport(AccountingReportQueryFilter filter);
     Task<byte[]> GenerateReceiptsAccountingExcel(AccountingReportQueryFilter filter);
     /// <summary>TXT (separado por tabulaciones) con el mismo contenido que la versión Excel del reporte.</summary>

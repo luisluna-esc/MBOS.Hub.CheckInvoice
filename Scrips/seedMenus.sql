@@ -16,12 +16,17 @@ INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_or
 ('Entradas', 'nav.receipts', '/receipts', 'receipt', NULL, 2, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
+-- Notas de ingreso sin factura: lo que llegó y todavía no cuenta en el stock ni en los reportes.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Salidas', 'nav.issues', '/issues', 'issue', NULL, 3, TRUE, NULL)
+('Ingresos Pendientes de Factura', 'nav.pendingReceipts', '/receipts/pending', 'pending', NULL, 3, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Catálogos', 'nav.catalogs', NULL, 'catalog', NULL, 9, TRUE, NULL)
+('Salidas', 'nav.issues', '/issues', 'issue', NULL, 4, TRUE, NULL)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
+('Catálogos', 'nav.catalogs', NULL, 'catalog', NULL, 10, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -53,7 +58,7 @@ WHERE m.name = 'Catálogos' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Transferencias', 'nav.transfers', NULL, 'transfer', NULL, 4, TRUE, NULL)
+('Transferencias', 'nav.transfers', NULL, 'transfer', NULL, 5, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -75,7 +80,7 @@ WHERE m.name = 'Transferencias' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Geografía', 'nav.geography', NULL, 'district', NULL, 10, TRUE, NULL)
+('Geografía', 'nav.geography', NULL, 'district', NULL, 11, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -91,7 +96,7 @@ WHERE m.name = 'Geografía' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Administración', 'nav.admin', NULL, 'admin', NULL, 12, TRUE, NULL)
+('Administración', 'nav.admin', NULL, 'admin', NULL, 13, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -114,7 +119,7 @@ ON CONFLICT DO NOTHING;
 
 -- Autorizaciones: las anulaciones de Salidas y de Entradas juntas.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Autorizaciones', 'nav.authorizations', NULL, 'void', NULL, 6, TRUE, NULL)
+('Autorizaciones', 'nav.authorizations', NULL, 'void', NULL, 7, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
@@ -152,25 +157,25 @@ ON CONFLICT DO NOTHING;
 -- ninguna Entrada/Salida existente. Internamente crea una Entrada tipo "Ajuste" o una Salida
 -- tipo "Salida por Merma" según el signo de la diferencia, así queda dentro del mismo Kardex.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Ajuste de Inventario', 'nav.stockAdjustment', '/stock-adjustments', 'adjustment', NULL, 14, FALSE, NULL)
+('Ajuste de Inventario', 'nav.stockAdjustment', '/stock-adjustments', 'adjustment', NULL, 15, FALSE, NULL)
 ON CONFLICT DO NOTHING;
 
 -- Devoluciones: apartado propio (no una acción dentro de Salidas). Se elige la Salida original
 -- y se registra el retorno como Entrada tipo "Devolucion" referenciando esa Salida.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Devoluciones', 'nav.issueReturns', '/issue-returns', 'return', NULL, 15, FALSE, NULL)
+('Devoluciones', 'nav.issueReturns', '/issue-returns', 'return', NULL, 16, FALSE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Cuentas por Cobrar', 'nav.accountReceivables', '/account-receivables', 'receivable', NULL, 7, TRUE, NULL)
+('Cuentas por Cobrar', 'nav.accountReceivables', '/account-receivables', 'receivable', NULL, 8, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Mi Cuenta', 'nav.myAccount', '/portal/my-account', 'portal', NULL, 8, TRUE, NULL)
+('Mi Cuenta', 'nav.myAccount', '/portal/my-account', 'portal', NULL, 9, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Reportes', 'nav.reports', NULL, 'report', NULL, 5, TRUE, NULL)
+('Reportes', 'nav.reports', NULL, 'report', NULL, 6, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 -- Historial de Entradas: buscar una nota de ingreso y reimprimirla. Antes era la pantalla de
@@ -275,7 +280,7 @@ ON CONFLICT DO NOTHING;
 -- Proveedores/Productos/Clientes) para no mezclar catálogos de negocio con catálogos de
 -- referencia/configuración del sistema.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id) VALUES
-('Configuración del Sistema', 'nav.settings', NULL, 'settings', NULL, 11, TRUE, NULL)
+('Configuración del Sistema', 'nav.settings', NULL, 'settings', NULL, 12, TRUE, NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)

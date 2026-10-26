@@ -811,6 +811,71 @@ CREATE TABLE receipt_void_request (
 CREATE INDEX idx_receipt_void_request_receipt ON receipt_void_request(receipt_id);
 CREATE UNIQUE INDEX uq_receipt_void_request_pending ON receipt_void_request(receipt_id) WHERE status = 'pending';
 
+-- Notas de ingreso sin factura y sus entregas: no tocan stock ni reportes hasta unir la factura.
+CREATE TABLE pending_receipt (
+    pending_receipt_id BIGSERIAL PRIMARY KEY,
+    monthly_number INT NOT NULL,
+    warehouse_id BIGINT NOT NULL,
+    supplier_id BIGINT,
+    received_date TIMESTAMP NOT NULL,
+    description VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'pendiente', -- pendiente | validado | anulado
+    receipt_id BIGINT, -- Entrada creada al unir la factura.
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_by BIGINT,
+    closed_at TIMESTAMP,
+    closed_by BIGINT,
+    CONSTRAINT fk_pending_receipt_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouse(warehouse_id),
+    CONSTRAINT fk_pending_receipt_supplier FOREIGN KEY (supplier_id) REFERENCES supplier(supplier_id),
+    CONSTRAINT fk_pending_receipt_receipt FOREIGN KEY (receipt_id) REFERENCES receipt(receipt_id),
+    CONSTRAINT fk_pending_receipt_created_by FOREIGN KEY (created_by) REFERENCES app_user(app_user_id),
+    CONSTRAINT fk_pending_receipt_closed_by FOREIGN KEY (closed_by) REFERENCES app_user(app_user_id)
+);
+CREATE INDEX idx_pending_receipt_status ON pending_receipt(status);
+
+CREATE TABLE pending_receipt_detail (
+    pending_receipt_detail_id BIGSERIAL PRIMARY KEY,
+    pending_receipt_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    quantity NUMERIC(12,2) NOT NULL,
+    CONSTRAINT fk_pending_receipt_detail_note FOREIGN KEY (pending_receipt_id) REFERENCES pending_receipt(pending_receipt_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pending_receipt_detail_product FOREIGN KEY (product_id) REFERENCES product(product_id)
+);
+CREATE INDEX idx_pending_receipt_detail_note ON pending_receipt_detail(pending_receipt_id);
+
+CREATE TABLE pending_delivery (
+    pending_delivery_id BIGSERIAL PRIMARY KEY,
+    pending_receipt_id BIGINT NOT NULL,
+    delivery_date TIMESTAMP NOT NULL,
+    issue_type_id BIGINT,
+    client_id BIGINT,
+    description VARCHAR(255),
+    send_to_accounts_receivable BOOLEAN NOT NULL DEFAULT FALSE,
+    payment_type VARCHAR(20),
+    payment_detail VARCHAR(255),
+    due_date DATE,
+    is_voided BOOLEAN NOT NULL DEFAULT FALSE,
+    issue_id BIGINT, -- Salida creada al unir la factura de la nota.
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_by BIGINT,
+    CONSTRAINT fk_pending_delivery_note FOREIGN KEY (pending_receipt_id) REFERENCES pending_receipt(pending_receipt_id),
+    CONSTRAINT fk_pending_delivery_issue_type FOREIGN KEY (issue_type_id) REFERENCES issue_type(issue_type_id),
+    CONSTRAINT fk_pending_delivery_client FOREIGN KEY (client_id) REFERENCES client(client_id),
+    CONSTRAINT fk_pending_delivery_issue FOREIGN KEY (issue_id) REFERENCES issue(issue_id),
+    CONSTRAINT fk_pending_delivery_created_by FOREIGN KEY (created_by) REFERENCES app_user(app_user_id)
+);
+CREATE INDEX idx_pending_delivery_note ON pending_delivery(pending_receipt_id);
+
+CREATE TABLE pending_delivery_detail (
+    pending_delivery_detail_id BIGSERIAL PRIMARY KEY,
+    pending_delivery_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    quantity NUMERIC(12,2) NOT NULL,
+    CONSTRAINT fk_pending_delivery_detail_delivery FOREIGN KEY (pending_delivery_id) REFERENCES pending_delivery(pending_delivery_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pending_delivery_detail_product FOREIGN KEY (product_id) REFERENCES product(product_id)
+);
+CREATE INDEX idx_pending_delivery_detail_delivery ON pending_delivery_detail(pending_delivery_id);
+
 -- =====================================================================
 -- SEED DATA
 -- =====================================================================

@@ -166,6 +166,7 @@ public static class DependencyInjection
         services.AddScoped<IValidator<ReceiptReturnRequestDto>, ReceiptReturnRequestValidator>();
 
         services.AddScoped<IIssueService, IssueService>();
+        services.AddScoped<IPendingReceiptService, PendingReceiptService>();
         services.AddScoped<IValidator<IssueRequestDto>, IssueRequestValidator>();
 
         services.AddScoped<IIssueVoidRequestService, IssueVoidRequestService>();
