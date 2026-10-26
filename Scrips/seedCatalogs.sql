@@ -58,10 +58,10 @@ INSERT INTO media_type (name, is_active) VALUES
 ('Libro', TRUE), ('Revista', TRUE), ('Folleto', TRUE), ('DVD', TRUE), ('Multimedia', TRUE)
 ON CONFLICT DO NOTHING;
 
--- Solo almacenes propios (el sistema ya no es entre misiones). Se agregan más (Almacén 2, 3...)
--- desde Configuración del Sistema > Almacenes.
+-- Solo almacenes propios (el sistema ya no es entre misiones): el central y el galpón.
 INSERT INTO warehouse (name, is_active) VALUES
-('ALMACEN CENTRAL MBOS', TRUE)
+('Almacen Central', TRUE),
+('Almacen Galpon Uno', TRUE)
 ON CONFLICT DO NOTHING;
 
 -- Casos especiales de facturación (códigos del SIN que reemplazan al NIT real del cliente).
