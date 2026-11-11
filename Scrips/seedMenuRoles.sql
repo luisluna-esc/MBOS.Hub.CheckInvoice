@@ -147,22 +147,13 @@ JOIN menu_role mr ON mr.menu_id = c.menu_id
 WHERE g.name = 'Autorizaciones'
 ON CONFLICT DO NOTHING;
 
--- Correcciones de Entradas: los mismos roles que las anulaciones de entradas.
+-- Correcciones de Entradas y de Salidas: las ven y las revisan Contador, M-BOS, Tesorero y
+-- Auxiliar Contador (nunca quien la pidió).
 INSERT INTO menu_role (menu_id, role_id)
-SELECT c.menu_id, mr.role_id
-FROM menu c
-JOIN menu a ON a.name = 'Anulaciones de Entradas'
-JOIN menu_role mr ON mr.menu_id = a.menu_id
-WHERE c.name = 'Correcciones de Entradas'
-ON CONFLICT DO NOTHING;
-
--- Correcciones de Salidas: los mismos roles que las correcciones de entradas.
-INSERT INTO menu_role (menu_id, role_id)
-SELECT c.menu_id, mr.role_id
-FROM menu c
-JOIN menu a ON a.name = 'Correcciones de Entradas'
-JOIN menu_role mr ON mr.menu_id = a.menu_id
-WHERE c.name = 'Correcciones de Salidas'
+SELECT m.menu_id, r.role_id
+FROM menu m, role r
+WHERE m.name IN ('Correcciones de Entradas', 'Correcciones de Salidas')
+  AND r.name IN ('Contador', 'M-BOS', 'Tesorero', 'Auxiliar Contador')
 ON CONFLICT DO NOTHING;
 
 -- Anulaciones de Transferencias: los mismos roles que las anulaciones de entradas.

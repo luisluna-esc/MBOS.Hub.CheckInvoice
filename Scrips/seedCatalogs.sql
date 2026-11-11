@@ -60,8 +60,8 @@ ON CONFLICT DO NOTHING;
 
 -- Solo almacenes propios (el sistema ya no es entre misiones): el central y el galpón.
 INSERT INTO warehouse (name, is_active) VALUES
-('Almacen Central', TRUE),
-('Almacen Galpon Uno', TRUE)
+('Almacén Central', TRUE),
+('Almacén Galpón Uno', TRUE)
 ON CONFLICT DO NOTHING;
 
 -- Casos especiales de facturación (códigos del SIN que reemplazan al NIT real del cliente).

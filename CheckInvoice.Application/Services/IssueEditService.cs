@@ -98,6 +98,11 @@ public class IssueEditService : IIssueEditService
         {
             return Error(changeRequestId, "La corrección ya fue revisada.", HttpStatusCode.BadRequest);
         }
+        // La revisa otra persona: quien la pidió no puede aprobar ni rechazar su propia corrección.
+        if (changeRequest.RequestedBy == _currentUserService.AppUserId)
+        {
+            return Error(changeRequestId, "No puedes revisar tu propia corrección: la revisa otro usuario.", HttpStatusCode.BadRequest);
+        }
 
         var issue = await _unitOfWork.Repository<Issue>().GetByIdAsync(changeRequest.RecordId);
         var edit = Read(changeRequest.ProposedData);
@@ -240,6 +245,11 @@ public class IssueEditService : IIssueEditService
         {
             return Error(changeRequestId, "La corrección ya fue revisada.", HttpStatusCode.BadRequest);
         }
+        // La revisa otra persona: quien la pidió no puede aprobar ni rechazar su propia corrección.
+        if (changeRequest.RequestedBy == _currentUserService.AppUserId)
+        {
+            return Error(changeRequestId, "No puedes revisar tu propia corrección: la revisa otro usuario.", HttpStatusCode.BadRequest);
+        }
 
         changeRequest.Status = "rejected";
         changeRequest.ReviewedBy = _currentUserService.AppUserId;
@@ -296,6 +306,7 @@ public class IssueEditService : IIssueEditService
                 NoteNumber = numbers.GetValueOrDefault(x.Request.RecordId) ?? x.Request.RecordId.ToString("00000", CultureInfo.InvariantCulture),
                 Status = x.Request.Status,
                 Reason = x.Request.Reason,
+                RequestedById = x.Request.RequestedBy,
                 RequestedByName = users.GetValueOrDefault(x.Request.RequestedBy),
                 RequestedAt = x.Request.RequestedAt,
                 ReviewedByName = x.Request.ReviewedBy.HasValue ? users.GetValueOrDefault(x.Request.ReviewedBy.Value) : null,

@@ -33,7 +33,9 @@ public partial class ReportService
             product_code AS "ProductCode",
             product_name AS "ProductName",
             department_name AS "DepartmentName",
-            quantity AS "Quantity"
+            quantity AS "Quantity",
+            unit_cost AS "UnitCost",
+            total_cost AS "TotalCost"
         FROM sp_get_issue_batch_sheet({0}::bigint)
         """;
 
@@ -69,6 +71,7 @@ public partial class ReportService
             .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
         var totals = products.ToDictionary(p => p.ProductId, p => active.Where(l => l.ProductId == p.ProductId).Sum(l => l.Quantity));
+        var costTotals = products.ToDictionary(p => p.ProductId, p => active.Where(l => l.ProductId == p.ProductId).Sum(l => l.TotalCost));
 
         var departments = products.Select(p => p.DepartmentName).Where(d => !string.IsNullOrWhiteSpace(d)).Distinct().ToList();
         var info = new List<string?>
@@ -160,6 +163,44 @@ public partial class ReportService
                             table.Cell().Element(CategoryTotalCell).AlignCenter().Text(Qty(totals[product.ProductId])).Bold();
                         }
                         table.Cell().Element(CategoryTotalCell).Text("");
+                    });
+
+                    // Resumen de costos: por material, la cantidad entregada, su costo unitario
+                    // (promedio con que salió) y el total según la cantidad.
+                    column.Item().PaddingTop(14).Column(summary =>
+                    {
+                        summary.Item().Text("RESUMEN DE COSTOS POR MATERIAL").Bold().FontColor(ReportAccent);
+                        summary.Item().PaddingTop(3).Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(3);
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                            });
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(HeaderCell).Text("Material");
+                                header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
+                                header.Cell().Element(HeaderCell).AlignRight().Text("Costo Unitario");
+                                header.Cell().Element(HeaderCell).AlignRight().Text("Total");
+                            });
+                            foreach (var product in products)
+                            {
+                                var quantity = totals[product.ProductId];
+                                var cost = costTotals[product.ProductId];
+                                var unit = quantity == 0 ? 0 : cost / quantity;
+                                table.Cell().Element(BodyCell).Text($"{product.ProductCode} - {product.ProductName}");
+                                table.Cell().Element(BodyCell).AlignRight().Text(Qty(quantity));
+                                table.Cell().Element(BodyCell).AlignRight().Text(unit.ToString("N2", ReportCulture));
+                                table.Cell().Element(BodyCell).AlignRight().Text(cost.ToString("N2", ReportCulture));
+                            }
+                            table.Cell().Element(CategoryTotalCell).AlignRight().Text("Total").Bold();
+                            table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(totals.Values.Sum())).Bold();
+                            table.Cell().Element(CategoryTotalCell).Text("");
+                            table.Cell().Element(CategoryTotalCell).AlignRight().Text($"Bs. {costTotals.Values.Sum().ToString("N2", ReportCulture)}").Bold();
+                        });
                     });
 
                     column.Item().PaddingTop(60).Row(signatures =>

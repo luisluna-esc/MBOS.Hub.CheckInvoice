@@ -224,8 +224,11 @@ $$;
 -- paginada de la pantalla CRUD), este devuelve la cartera completa sin paginar, con el
 -- nombre del cliente ya resuelto (join client -> party) porque el reporte es de todos los
 -- clientes a la vez y no tendría sentido resolver cada nombre uno por uno en el backend
--- (como sí hace el Reporte Campo Pastor, que es de un solo cliente). El filtro de fecha
--- aplica sobre due_date (fecha límite), que es el dato relevante para una cartera de cobro.
+-- (como sí hace el Reporte Campo Pastor, que es de un solo cliente).
+-- Fechas como corte (2026-11-05): el saldo se arrastra. Salen las cuentas de salidas hasta la
+-- fecha fin; las de antes de la fecha inicio solo si todavía deben algo (lo pendiente de agosto
+-- sigue saliendo en septiembre y después). Antes se filtraba por fecha límite y lo pendiente
+-- de meses anteriores desaparecía del reporte.
 DROP FUNCTION IF EXISTS sp_get_account_receivables_report(BIGINT, VARCHAR, DATE, DATE);
 CREATE OR REPLACE FUNCTION sp_get_account_receivables_report(
     p_client_id BIGINT,
@@ -290,8 +293,8 @@ AS $$
                 END
               ) = p_status
           )
-      AND (p_date_from IS NULL OR ar.due_date >= p_date_from)
-      AND (p_date_to IS NULL OR ar.due_date < p_date_to + 1)
+      AND (p_date_to IS NULL OR COALESCE(i.issue_date, ar.created_at) < p_date_to + 1)
+      AND (p_date_from IS NULL OR ar.outstanding_balance > 0 OR COALESCE(i.issue_date, ar.created_at) >= p_date_from)
     ORDER BY (ar.status = 'paid'), ar.due_date NULLS LAST, ar.account_receivable_id;
 $$;
 
@@ -707,6 +710,82 @@ $$;
 -- Junta 4 fuentes (entrada, salida, transferencia x2 direcciones) agregadas
 -- por producto — exactamente el tipo de consulta que no conviene traer cruda
 -- a C# para sumarla ahí.
+-- Saldo (cantidad y valor) de cada producto en un almacén (o en todos) a una fecha.
+-- Las transferencias no guardan costo: se valorizan al costo promedio actual del producto.
+CREATE OR REPLACE FUNCTION fn_stock_balance(
+    p_warehouse_id BIGINT,
+    p_date_from DATE,
+    p_date_to DATE,
+    p_review_state VARCHAR DEFAULT NULL
+)
+RETURNS TABLE (
+    product_id BIGINT,
+    quantity NUMERIC,
+    total_value NUMERIC
+)
+LANGUAGE sql
+STABLE
+AS $$
+    WITH movements AS (
+        SELECT rd.product_id, r.issue_date AS moved_at, rd.quantity AS qty, rd.total_cost AS val, 0::numeric AS transfer_qty
+        FROM receipt_detail rd
+        JOIN receipt r ON r.receipt_id = rd.receipt_id
+        WHERE NOT r.is_voided AND fn_review_matches(r.review_status, p_review_state)
+          AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
+          AND (p_date_to IS NULL OR r.issue_date < p_date_to + 1)
+        UNION ALL
+        SELECT idt.product_id, i.issue_date, -idt.quantity, -idt.total_cost, 0
+        FROM issue_detail idt
+        JOIN issue i ON i.issue_id = idt.issue_id
+        WHERE NOT i.is_voided AND fn_review_matches(i.review_status, p_review_state)
+          AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
+          AND (p_date_to IS NULL OR i.issue_date < p_date_to + 1)
+        UNION ALL
+        -- Solo las transferencias internas (con almacén de origen) suben el stock del destino.
+        SELECT td.product_id, t.transfer_date, td.quantity, 0, td.quantity
+        FROM transfer_detail td
+        JOIN transfer t ON t.transfer_id = td.transfer_id
+        WHERE NOT t.is_voided AND fn_review_matches(t.review_status, p_review_state)
+          AND t.source_warehouse_id IS NOT NULL
+          AND (p_warehouse_id IS NULL OR t.destination_warehouse_id = p_warehouse_id)
+          AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
+        UNION ALL
+        SELECT td.product_id, t.transfer_date, -td.quantity, 0, -td.quantity
+        FROM transfer_detail td
+        JOIN transfer t ON t.transfer_id = td.transfer_id
+        WHERE NOT t.is_voided AND fn_review_matches(t.review_status, p_review_state)
+          AND (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
+          AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
+    ),
+    totals AS (
+        SELECT m.product_id,
+               SUM(m.qty) AS qty,
+               SUM(m.val) AS val,
+               SUM(m.transfer_qty) AS transfer_qty,
+               BOOL_OR(p_date_from IS NULL OR m.moved_at >= p_date_from) AS moved_in_period
+        FROM movements m
+        GROUP BY m.product_id
+    ),
+    current_cost AS (
+        SELECT s.product_id,
+               CASE WHEN SUM(s.quantity) > 0 THEN SUM(s.quantity * s.average_cost) / SUM(s.quantity)
+                    ELSE MAX(s.average_cost) END AS average_cost
+        FROM stock s
+        WHERE p_warehouse_id IS NULL OR s.warehouse_id = p_warehouse_id
+        GROUP BY s.product_id
+    )
+    -- Si el valor da cero o menos con cantidad positiva (salidas antiguas registradas a un
+    -- costo distinto del promedio), se usa el costo promedio guardado: nunca se muestra negativo.
+    SELECT t.product_id,
+           t.qty,
+           CASE WHEN t.val + t.transfer_qty * COALESCE(c.average_cost, 0) > 0
+                THEN t.val + t.transfer_qty * COALESCE(c.average_cost, 0)
+                ELSE t.qty * COALESCE(c.average_cost, 0) END
+    FROM totals t
+    LEFT JOIN current_cost c ON c.product_id = t.product_id
+    WHERE t.moved_in_period AND t.qty > 0;
+$$;
+
 CREATE OR REPLACE FUNCTION sp_get_stock_report(
     p_warehouse_id BIGINT,
     p_date_from DATE,
@@ -729,56 +808,6 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 AS $$
-    WITH receipts AS (
-        SELECT rd.product_id,
-               SUM(rd.quantity) AS qty,
-               SUM(rd.quantity * rd.unit_cost) AS cost_total
-        FROM receipt_detail rd
-        JOIN receipt r ON r.receipt_id = rd.receipt_id
-        WHERE NOT r.is_voided AND fn_review_matches(r.review_status, p_review_state)
-          AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
-          AND (p_date_from IS NULL OR r.issue_date >= p_date_from)
-          AND (p_date_to IS NULL OR r.issue_date < p_date_to + 1)
-        GROUP BY rd.product_id
-    ),
-    issues AS (
-        SELECT idt.product_id,
-               SUM(idt.quantity) AS qty
-        FROM issue_detail idt
-        JOIN issue i ON i.issue_id = idt.issue_id
-        WHERE NOT i.is_voided AND fn_review_matches(i.review_status, p_review_state)
-          AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
-          AND (p_date_from IS NULL OR i.issue_date >= p_date_from)
-          AND (p_date_to IS NULL OR i.issue_date < p_date_to + 1)
-        GROUP BY idt.product_id
-    ),
-    transfers_in AS (
-        -- Solo transferencias internas (con almacén de origen) llegan a tocar
-        -- stock.quantity de verdad (ver TransferService.InsertTransfer) — una
-        -- transferencia externa (source_warehouse_id IS NULL) queda solo como
-        -- registro pendiente de revisión y nunca incrementa el stock destino.
-        SELECT td.product_id,
-               SUM(td.quantity) AS qty
-        FROM transfer_detail td
-        JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE fn_review_matches(t.review_status, p_review_state)
-          AND t.source_warehouse_id IS NOT NULL
-          AND (p_warehouse_id IS NULL OR t.destination_warehouse_id = p_warehouse_id)
-          AND (p_date_from IS NULL OR t.transfer_date >= p_date_from)
-          AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
-        GROUP BY td.product_id
-    ),
-    transfers_out AS (
-        SELECT td.product_id,
-               SUM(td.quantity) AS qty
-        FROM transfer_detail td
-        JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE fn_review_matches(t.review_status, p_review_state)
-          AND (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
-          AND (p_date_from IS NULL OR t.transfer_date >= p_date_from)
-          AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
-        GROUP BY td.product_id
-    )
     SELECT
         p.product_id,
         p.code,
@@ -788,26 +817,17 @@ AS $$
         d.name AS department_name,
         p.sub_department_id,
         sd.name AS sub_department_name,
-        COALESCE(r.qty, 0) - COALESCE(iss.qty, 0) + COALESCE(ti.qty, 0) - COALESCE(tou.qty, 0) AS net_quantity,
-        CASE WHEN COALESCE(r.qty, 0) = 0 THEN 0 ELSE r.cost_total / r.qty END AS unit_value,
-        (COALESCE(r.qty, 0) - COALESCE(iss.qty, 0) + COALESCE(ti.qty, 0) - COALESCE(tou.qty, 0))
-            * (CASE WHEN COALESCE(r.qty, 0) = 0 THEN 0 ELSE r.cost_total / r.qty END) AS total_value
-    FROM product p
+        b.quantity AS net_quantity,
+        ROUND(b.total_value / b.quantity, 4) AS unit_value,
+        ROUND(b.total_value, 2) AS total_value
+    FROM fn_stock_balance(p_warehouse_id, p_date_from, p_date_to, p_review_state) b
+    JOIN product p ON p.product_id = b.product_id
     LEFT JOIN department d ON d.department_id = p.department_id
     LEFT JOIN sub_department sd ON sd.sub_department_id = p.sub_department_id
     LEFT JOIN media_type mt ON mt.media_type_id = p.media_type_id
-    LEFT JOIN receipts r ON r.product_id = p.product_id
-    LEFT JOIN issues iss ON iss.product_id = p.product_id
-    LEFT JOIN transfers_in ti ON ti.product_id = p.product_id
-    LEFT JOIN transfers_out tou ON tou.product_id = p.product_id
-    WHERE r.product_id IS NOT NULL OR iss.product_id IS NOT NULL
-       OR ti.product_id IS NOT NULL OR tou.product_id IS NOT NULL
     ORDER BY d.name, sd.name, p.name;
 $$;
 
--- Reporte "Stock - Departamento": misma fórmula que sp_get_stock_report (movimiento
--- neto valorizado al costo promedio ponderado), pero con Categoría (departamento)
--- como filtro en lugar de agrupador — el reporte se centra en Subcategoría.
 CREATE OR REPLACE FUNCTION sp_get_stock_report_by_department(
     p_warehouse_id BIGINT,
     p_department_id BIGINT,
@@ -831,54 +851,6 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 AS $$
-    WITH receipts AS (
-        SELECT rd.product_id,
-               SUM(rd.quantity) AS qty,
-               SUM(rd.quantity * rd.unit_cost) AS cost_total
-        FROM receipt_detail rd
-        JOIN receipt r ON r.receipt_id = rd.receipt_id
-        WHERE NOT r.is_voided AND fn_review_matches(r.review_status, p_review_state)
-          AND (p_warehouse_id IS NULL OR r.warehouse_id = p_warehouse_id)
-          AND (p_date_from IS NULL OR r.issue_date >= p_date_from)
-          AND (p_date_to IS NULL OR r.issue_date < p_date_to + 1)
-        GROUP BY rd.product_id
-    ),
-    issues AS (
-        SELECT idt.product_id,
-               SUM(idt.quantity) AS qty
-        FROM issue_detail idt
-        JOIN issue i ON i.issue_id = idt.issue_id
-        WHERE NOT i.is_voided AND fn_review_matches(i.review_status, p_review_state)
-          AND (p_warehouse_id IS NULL OR i.warehouse_id = p_warehouse_id)
-          AND (p_date_from IS NULL OR i.issue_date >= p_date_from)
-          AND (p_date_to IS NULL OR i.issue_date < p_date_to + 1)
-        GROUP BY idt.product_id
-    ),
-    transfers_in AS (
-        -- Solo transferencias internas (con almacén de origen) tocan stock.quantity de
-        -- verdad — ver el mismo comentario en sp_get_stock_report.
-        SELECT td.product_id,
-               SUM(td.quantity) AS qty
-        FROM transfer_detail td
-        JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE fn_review_matches(t.review_status, p_review_state)
-          AND t.source_warehouse_id IS NOT NULL
-          AND (p_warehouse_id IS NULL OR t.destination_warehouse_id = p_warehouse_id)
-          AND (p_date_from IS NULL OR t.transfer_date >= p_date_from)
-          AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
-        GROUP BY td.product_id
-    ),
-    transfers_out AS (
-        SELECT td.product_id,
-               SUM(td.quantity) AS qty
-        FROM transfer_detail td
-        JOIN transfer t ON t.transfer_id = td.transfer_id
-        WHERE fn_review_matches(t.review_status, p_review_state)
-          AND (p_warehouse_id IS NULL OR t.source_warehouse_id = p_warehouse_id)
-          AND (p_date_from IS NULL OR t.transfer_date >= p_date_from)
-          AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
-        GROUP BY td.product_id
-    )
     SELECT
         p.product_id,
         p.code,
@@ -888,21 +860,15 @@ AS $$
         d.name AS department_name,
         p.sub_department_id,
         sd.name AS sub_department_name,
-        COALESCE(r.qty, 0) - COALESCE(iss.qty, 0) + COALESCE(ti.qty, 0) - COALESCE(tou.qty, 0) AS net_quantity,
-        CASE WHEN COALESCE(r.qty, 0) = 0 THEN 0 ELSE r.cost_total / r.qty END AS unit_value,
-        (COALESCE(r.qty, 0) - COALESCE(iss.qty, 0) + COALESCE(ti.qty, 0) - COALESCE(tou.qty, 0))
-            * (CASE WHEN COALESCE(r.qty, 0) = 0 THEN 0 ELSE r.cost_total / r.qty END) AS total_value
-    FROM product p
+        b.quantity AS net_quantity,
+        ROUND(b.total_value / b.quantity, 4) AS unit_value,
+        ROUND(b.total_value, 2) AS total_value
+    FROM fn_stock_balance(p_warehouse_id, p_date_from, p_date_to, p_review_state) b
+    JOIN product p ON p.product_id = b.product_id
     LEFT JOIN department d ON d.department_id = p.department_id
     LEFT JOIN sub_department sd ON sd.sub_department_id = p.sub_department_id
     LEFT JOIN media_type mt ON mt.media_type_id = p.media_type_id
-    LEFT JOIN receipts r ON r.product_id = p.product_id
-    LEFT JOIN issues iss ON iss.product_id = p.product_id
-    LEFT JOIN transfers_in ti ON ti.product_id = p.product_id
-    LEFT JOIN transfers_out tou ON tou.product_id = p.product_id
-    WHERE (p_department_id IS NULL OR p.department_id = p_department_id)
-      AND (r.product_id IS NOT NULL OR iss.product_id IS NOT NULL
-       OR ti.product_id IS NOT NULL OR tou.product_id IS NOT NULL)
+    WHERE p_department_id IS NULL OR p.department_id = p_department_id
     ORDER BY sd.name, p.name;
 $$;
 
@@ -1023,6 +989,7 @@ AS $$
           AND (p_date_to IS NULL OR t.transfer_date < p_date_to + 1)
         GROUP BY td.product_id
     )
+    , raw AS (
     SELECT
         p.product_id,
         p.code,
@@ -1070,7 +1037,31 @@ AS $$
        OR tib.product_id IS NOT NULL OR tob.product_id IS NOT NULL
        OR rp.product_id IS NOT NULL OR ip.product_id IS NOT NULL
        OR tip.product_id IS NOT NULL OR tup.product_id IS NOT NULL
-    ORDER BY sd.name, p.name;
+    ),
+    current_cost AS (
+        SELECT s.product_id,
+               CASE WHEN SUM(s.quantity) > 0 THEN SUM(s.quantity * s.average_cost) / SUM(s.quantity)
+                    ELSE MAX(s.average_cost) END AS average_cost
+        FROM stock s
+        WHERE p_warehouse_id IS NULL OR s.warehouse_id = p_warehouse_id
+        GROUP BY s.product_id
+    )
+    -- Nunca valores negativos (2026-11-05): sin saldo el valor es 0; con saldo y valor negativo
+    -- (salidas antiguas registradas a un costo distinto del promedio) se usa el costo promedio.
+    SELECT
+        r.product_id, r.code, r.name, r.sub_department_id, r.sub_department_name,
+        r.opening_quantity,
+        CASE WHEN r.opening_quantity <= 0 THEN 0
+             WHEN r.opening_value < 0 THEN r.opening_quantity * COALESCE(c.average_cost, 0)
+             ELSE r.opening_value END AS opening_value,
+        r.receipts_quantity, r.receipts_value, r.issues_quantity, r.issues_value,
+        r.closing_quantity,
+        CASE WHEN r.closing_quantity <= 0 THEN 0
+             WHEN r.closing_value < 0 THEN r.closing_quantity * COALESCE(c.average_cost, 0)
+             ELSE r.closing_value END AS closing_value
+    FROM raw r
+    LEFT JOIN current_cost c ON c.product_id = r.product_id
+    ORDER BY r.sub_department_name, r.name;
 $$;
 
 -- Reporte "Levantamiento de Inventario": detalle de conteo físico (cantidad de sistema
@@ -1591,6 +1582,27 @@ AS $$
     WHERE i.issue_id = p_issue_id;
 $$;
 
+-- Salidas del buzón en un paso de firma: una fila por salida suelta y una por lote. Las salidas
+-- de un lote se firman juntas (DocumentReviewService); una salida corregida o reabierta tiene otra
+-- versión y sale sola, con el nombre de su pastor.
+CREATE OR REPLACE FUNCTION fn_inbox_issue_groups(p_status VARCHAR)
+RETURNS TABLE (document_id BIGINT, detail TEXT, at TIMESTAMP)
+LANGUAGE sql
+STABLE
+AS $$
+    SELECT min(i.issue_id),
+           CASE WHEN i.issue_batch_id IS NULL THEN max(it.name)::text
+                WHEN count(*) > 1 THEN max(it.name) || ', ' || count(*) || ' pastores'
+                ELSE max(it.name) || ', ' || coalesce(max(p.name), '—') END,
+           min(i.created_at)
+    FROM issue i
+    LEFT JOIN issue_type it ON it.issue_type_id = i.issue_type_id
+    LEFT JOIN client c ON c.client_id = i.client_id
+    LEFT JOIN party p ON p.party_id = c.party_id
+    WHERE NOT i.is_voided AND i.review_status = p_status
+    GROUP BY CASE WHEN i.issue_batch_id IS NULL THEN i.issue_id END, i.issue_batch_id, i.review_version;
+$$;
+
 CREATE OR REPLACE FUNCTION sp_inbox_items(
     p_user_id BIGINT,
     p_can_verify BOOLEAN,
@@ -1610,16 +1622,32 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 AS $$
-    WITH pending AS (
+    -- Firmas: las de un lote firmado de una vez quedan en una sola fila (la de la primera salida).
+    WITH reviews AS (
+        SELECT d.*
+        FROM document_review d
+        LEFT JOIN issue bi ON d.document_type = 'issue' AND bi.issue_id = d.document_id
+        WHERE bi.issue_batch_id IS NULL
+           OR NOT EXISTS (
+               SELECT 1
+               FROM document_review o
+               JOIN issue oi ON oi.issue_id = o.document_id
+               WHERE o.document_type = 'issue' AND oi.issue_batch_id = bi.issue_batch_id
+                 AND o.action = d.action AND o.at = d.at AND o.user_id IS NOT DISTINCT FROM d.user_id
+                 AND o.document_id < d.document_id)
+    ),
+    -- Correcciones por revisar: les llegan a Contador, M-BOS y Tesorero (p_can_verify), menos a
+    -- quien la pidió. El Auxiliar Contador solo las pide.
+    pending AS (
         SELECT 'toVerify'::varchar AS kind, 'receipt'::varchar AS document_type, r.receipt_id AS document_id,
                'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY') AS number,
                rt.name::text AS detail, NULL::varchar AS status, r.created_at AS at
         FROM receipt r LEFT JOIN receipt_type rt ON rt.receipt_type_id = r.receipt_type_id
         WHERE p_can_verify AND NOT r.is_voided AND r.review_status = 'digitado'
         UNION ALL
-        SELECT 'toVerify', 'issue', i.issue_id, fn_issue_number(i.issue_id), it.name::text, NULL, i.created_at
-        FROM issue i LEFT JOIN issue_type it ON it.issue_type_id = i.issue_type_id
-        WHERE p_can_verify AND NOT i.is_voided AND i.review_status = 'digitado'
+        SELECT 'toVerify', 'issue', g.document_id, fn_issue_number(g.document_id), g.detail, NULL, g.at
+        FROM fn_inbox_issue_groups('digitado') g
+        WHERE p_can_verify
         UNION ALL
         SELECT 'toVerify', 'transfer', t.transfer_id, lpad(t.transfer_id::text, 5, '0'),
                coalesce(ws.name, '—') || ' → ' || coalesce(wd.name, '—'), NULL, t.transfer_date
@@ -1633,9 +1661,9 @@ AS $$
         FROM receipt r LEFT JOIN receipt_type rt ON rt.receipt_type_id = r.receipt_type_id
         WHERE p_can_approve AND NOT r.is_voided AND r.review_status = 'verificado'
         UNION ALL
-        SELECT 'toApprove', 'issue', i.issue_id, fn_issue_number(i.issue_id), it.name::text, NULL, i.created_at
-        FROM issue i LEFT JOIN issue_type it ON it.issue_type_id = i.issue_type_id
-        WHERE p_can_approve AND NOT i.is_voided AND i.review_status = 'verificado'
+        SELECT 'toApprove', 'issue', g.document_id, fn_issue_number(g.document_id), g.detail, NULL, g.at
+        FROM fn_inbox_issue_groups('verificado') g
+        WHERE p_can_approve
         UNION ALL
         SELECT 'toApprove', 'transfer', t.transfer_id, lpad(t.transfer_id::text, 5, '0'),
                coalesce(ws.name, '—') || ' → ' || coalesce(wd.name, '—'), NULL, t.transfer_date
@@ -1660,11 +1688,11 @@ AS $$
         SELECT 'receiptEdit', 'receipt', r.receipt_id,
                'I ' || r.monthly_number || '-' || to_char(r.issue_date, 'MM-YY'), c.reason::text, NULL, c.requested_at
         FROM change_request c JOIN receipt r ON r.receipt_id = c.record_id
-        WHERE p_can_approve AND c.table_name = 'receipt_edit' AND c.status = 'pending'
+        WHERE p_can_verify AND c.requested_by IS DISTINCT FROM p_user_id AND c.table_name = 'receipt_edit' AND c.status = 'pending'
         UNION ALL
         SELECT 'issueEdit', 'issue', c.record_id, fn_issue_number(c.record_id), c.reason::text, NULL, c.requested_at
         FROM change_request c
-        WHERE p_can_approve AND c.table_name = 'issue_edit' AND c.status = 'pending'
+        WHERE p_can_verify AND c.requested_by IS DISTINCT FROM p_user_id AND c.table_name = 'issue_edit' AND c.status = 'pending'
     ),
     -- Respuestas a lo que pidió o digitó el usuario (anulaciones, correcciones y la firma final
     -- de sus documentos, aprobados o rechazados).
@@ -1708,7 +1736,7 @@ AS $$
                CASE WHEN d.action = 'aprobado' THEN 'approved' ELSE 'rejected' END::varchar,
                d.at,
                'review_' || CASE WHEN d.action = 'aprobado' THEN 'approved' ELSE 'rejected' END || ':' || d.document_review_id
-        FROM document_review d
+        FROM reviews d
         WHERE d.action IN ('aprobado', 'rechazado')
           AND d.user_id <> p_user_id
           AND EXISTS (
@@ -1724,7 +1752,7 @@ AS $$
                     WHEN d.document_type = 'issue' THEN fn_issue_number(d.document_id)
                     ELSE lpad(d.document_id::text, 5, '0') END AS number,
                d.reason::text AS detail, d.action::varchar AS status, d.at AS at
-        FROM document_review d
+        FROM reviews d
         WHERE d.user_id = p_user_id AND d.action IN ('verificado', 'aprobado', 'rechazado', 'reabierto')
         UNION ALL
         SELECT 'voidRequest', 'receipt', r.receipt_id,
@@ -1844,7 +1872,9 @@ AS $$
     SELECT count(*)::int FROM inserted;
 $$;
 
--- Hoja de firmas de una salida por lote: una fila por pastor y material.
+-- Hoja de firmas de una salida por lote: una fila por pastor y material, con el costo con que
+-- salió cada material (para el resumen de costos al pie de la hoja).
+DROP FUNCTION IF EXISTS sp_get_issue_batch_sheet(BIGINT);
 CREATE OR REPLACE FUNCTION sp_get_issue_batch_sheet(p_issue_batch_id BIGINT)
 RETURNS TABLE (
     issue_batch_id BIGINT,
@@ -1862,7 +1892,9 @@ RETURNS TABLE (
     product_code VARCHAR,
     product_name VARCHAR,
     department_name VARCHAR,
-    quantity NUMERIC
+    quantity NUMERIC,
+    unit_cost NUMERIC,
+    total_cost NUMERIC
 )
 LANGUAGE sql
 STABLE
@@ -1883,7 +1915,9 @@ AS $$
         p.code AS product_code,
         p.name AS product_name,
         dep.name AS department_name,
-        d.quantity
+        d.quantity,
+        d.unit_cost,
+        d.total_cost
     FROM issue_batch b
     JOIN issue i ON i.issue_batch_id = b.issue_batch_id
     JOIN issue_detail d ON d.issue_id = i.issue_id

@@ -11,6 +11,10 @@ namespace CheckInvoice.Web.Controllers;
 [Route("api/[controller]")]
 public class ReceiptEditsController : ControllerBase
 {
+    // Las correcciones las revisan Contador, M-BOS y Tesorero (nunca quien la pidió, ver el
+    // servicio). El Auxiliar Contador solo las pide.
+    private const string CorrectionReviewerRoles = "Contador,M-BOS,Tesorero";
+
     private readonly IReceiptEditService _receiptEditService;
 
     public ReceiptEditsController(IReceiptEditService receiptEditService)
@@ -34,7 +38,7 @@ public class ReceiptEditsController : ControllerBase
         return StatusCode((int)result.StatusCode, result);
     }
 
-    [Authorize(Roles = "Contador,M-BOS")]
+    [Authorize(Roles = CorrectionReviewerRoles)]
     [HttpPut("{id}/approve")]
     public async Task<IActionResult> Approve(long id, [FromBody] ReceiptEditReviewDto body)
     {
@@ -42,7 +46,7 @@ public class ReceiptEditsController : ControllerBase
         return StatusCode((int)result.StatusCode, result);
     }
 
-    [Authorize(Roles = "Contador,M-BOS")]
+    [Authorize(Roles = CorrectionReviewerRoles)]
     [HttpPut("{id}/reject")]
     public async Task<IActionResult> Reject(long id, [FromBody] ReceiptEditReviewDto body)
     {

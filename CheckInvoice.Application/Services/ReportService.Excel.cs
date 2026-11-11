@@ -34,7 +34,7 @@ public partial class ReportService
         var info = new List<string>
         {
             $"Almacén: {await WarehouseNameAsync(filter.WarehouseId)}",
-            $"Saldo al: {BalanceDateText(filter.DateTo)}",
+            StockDateInfo(filter),
             $"Estado: {ReviewStates.Label(filter.ReviewState)}"
         };
         return await BuildWorkbookAsync(wb => AddSheet(wb, "Inventario general", "INVENTARIO GENERAL", info, StockColumns(), rows));
@@ -293,7 +293,7 @@ public partial class ReportService
         var info = new List<string>
         {
             $"Cliente: {(filter.ClientId.HasValue ? await ClientNameAsync(filter.ClientId.Value) : null) ?? "Todos los clientes"}",
-            $"Estado: {statusLabel} — Fecha límite: {PeriodText(filter.DateFrom, filter.DateTo)}",
+            $"Estado: {statusLabel} · Corte: {PeriodText(filter.DateFrom, filter.DateTo)} (lo pendiente de antes se arrastra)",
             $"Cuentas pendientes: {accounts.Count(a => a.Status != "paid")}"
         };
 

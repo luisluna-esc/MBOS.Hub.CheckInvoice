@@ -188,7 +188,7 @@ ON CONFLICT DO NOTHING;
 
 -- Historial de Salidas: igual que el de Entradas; Salidas solo pregunta el tipo de salida.
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Historial de Salidas', 'nav.reportsIssueHistory', '/reports/issue-history', NULL, m.menu_id, 8, TRUE, NULL
+SELECT 'Historial de Salidas', 'nav.reportsIssueHistory', '/reports/issue-history', NULL, m.menu_id, 7, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
@@ -224,7 +224,7 @@ WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Ingresos de Almacén', 'nav.reportsReceipts', '/reports/receipts', NULL, m.menu_id, 7, TRUE, NULL
+SELECT 'Ingresos de Almacén', 'nav.reportsReceipts', '/reports/receipts', NULL, m.menu_id, 8, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
@@ -255,13 +255,13 @@ WHERE m.name = 'Reportes' AND m.parent_menu_id IS NULL
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Salidas para Contabilidad', 'nav.reportsIssuesAccounting', '/reports/issues-accounting', NULL, m.menu_id, 1, TRUE, NULL
+SELECT 'Salidas para Contabilidad', 'nav.reportsIssuesAccounting', '/reports/issues-accounting', NULL, m.menu_id, 2, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Contabilidad'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO menu (name, translation_key, route, icon, parent_menu_id, display_order, is_active, permission_id)
-SELECT 'Ingresos para Contabilidad', 'nav.reportsReceiptsAccounting', '/reports/receipts-accounting', NULL, m.menu_id, 2, TRUE, NULL
+SELECT 'Ingresos para Contabilidad', 'nav.reportsReceiptsAccounting', '/reports/receipts-accounting', NULL, m.menu_id, 1, TRUE, NULL
 FROM menu m
 WHERE m.name = 'Contabilidad'
 ON CONFLICT DO NOTHING;

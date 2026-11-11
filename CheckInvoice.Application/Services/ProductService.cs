@@ -128,6 +128,7 @@ public class ProductService : IProductService
             .ToList();
 
         await ValidateForeignKeys(productDto, errors);
+        await ValidateDuplicate(productDto, null, errors);
 
         if (errors.Count > 0)
         {
@@ -173,6 +174,7 @@ public class ProductService : IProductService
             .ToList();
 
         await ValidateForeignKeys(productDto, errors);
+        await ValidateDuplicate(productDto, id, errors);
 
         if (errors.Count > 0)
         {
@@ -271,6 +273,64 @@ public class ProductService : IProductService
         var hasTransferDetail = await _unitOfWork.Repository<TransferDetail>().Query().AnyAsync(d => d.ProductId == productId);
 
         return hasReceiptDetail || hasIssueDetail || hasTransferDetail;
+    }
+
+    // No se repite un producto: mismo nombre (sin importar mayúsculas, tildes ni espacios de más)
+    // en el mismo departamento y subdepartamento. Así, al crear un producto desde una entrada, no
+    // se duplica uno que ya existe.
+    private async Task ValidateDuplicate(ProductDto productDto, long? excludeId, List<Message> errors)
+    {
+        var name = NormalizeName(productDto.Name);
+        if (name.Length == 0)
+        {
+            return;
+        }
+
+        var candidates = await _unitOfWork.Repository<Product>().Query()
+            .Where(p => p.DepartmentId == productDto.DepartmentId && p.SubDepartmentId == productDto.SubDepartmentId
+                        && (excludeId == null || p.ProductId != excludeId))
+            .Select(p => new { p.Code, p.Name })
+            .ToListAsync();
+
+        var existing = candidates.FirstOrDefault(p => NormalizeName(p.Name) == name);
+        if (existing is not null)
+        {
+            errors.Add(new Message
+            {
+                Type = MessageType.Error,
+                Description = $"Ya existe el producto \"{existing.Name}\" (código {existing.Code}) en ese departamento y subdepartamento."
+            });
+        }
+    }
+
+    private static string NormalizeName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+        var decomposed = value.Trim().ToLowerInvariant().Normalize(System.Text.NormalizationForm.FormD);
+        var builder = new System.Text.StringBuilder(decomposed.Length);
+        var lastWasSpace = false;
+        foreach (var c in decomposed)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+            if (char.IsWhiteSpace(c))
+            {
+                if (!lastWasSpace)
+                {
+                    builder.Append(' ');
+                }
+                lastWasSpace = true;
+                continue;
+            }
+            builder.Append(c);
+            lastWasSpace = false;
+        }
+        return builder.ToString();
     }
 
     private async Task ValidateForeignKeys(ProductDto productDto, List<Message> errors)

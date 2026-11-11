@@ -113,6 +113,11 @@ public class ReceiptEditService : IReceiptEditService
         {
             return Error(changeRequestId, "La corrección ya fue revisada.", HttpStatusCode.BadRequest);
         }
+        // La revisa otra persona: quien la pidió no puede aprobar ni rechazar su propia corrección.
+        if (changeRequest.RequestedBy == _currentUserService.AppUserId)
+        {
+            return Error(changeRequestId, "No puedes revisar tu propia corrección: la revisa otro usuario.", HttpStatusCode.BadRequest);
+        }
 
         var receipt = await _unitOfWork.Repository<Receipt>().GetByIdAsync(changeRequest.RecordId);
         var proposal = ReadProposal(changeRequest.ProposedData);
@@ -264,6 +269,11 @@ public class ReceiptEditService : IReceiptEditService
         {
             return Error(changeRequestId, "La corrección ya fue revisada.", HttpStatusCode.BadRequest);
         }
+        // La revisa otra persona: quien la pidió no puede aprobar ni rechazar su propia corrección.
+        if (changeRequest.RequestedBy == _currentUserService.AppUserId)
+        {
+            return Error(changeRequestId, "No puedes revisar tu propia corrección: la revisa otro usuario.", HttpStatusCode.BadRequest);
+        }
 
         changeRequest.Status = "rejected";
         changeRequest.ReviewedBy = _currentUserService.AppUserId;
@@ -329,6 +339,7 @@ public class ReceiptEditService : IReceiptEditService
                 NoteNumber = receipt is null ? x.Request.RecordId.ToString(CultureInfo.InvariantCulture) : ReceiptNumbering.Format(receipt.MonthlyNumber, receipt.IssueDate, receipt.ReceiptId),
                 Status = x.Request.Status,
                 Reason = x.Request.Reason,
+                RequestedById = x.Request.RequestedBy,
                 RequestedByName = users.GetValueOrDefault(x.Request.RequestedBy),
                 RequestedAt = x.Request.RequestedAt,
                 ReviewedByName = x.Request.ReviewedBy.HasValue ? users.GetValueOrDefault(x.Request.ReviewedBy.Value) : null,

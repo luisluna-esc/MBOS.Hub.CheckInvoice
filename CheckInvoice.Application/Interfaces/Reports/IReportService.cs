@@ -14,6 +14,8 @@ public interface IReportService
     Task<List<StockReportRowDto>> GetStockByDepartmentReport(StockByDepartmentReportQueryFilter filter);
     Task<byte[]> GenerateStockByDepartmentReportPdf(StockByDepartmentReportQueryFilter filter);
     Task<byte[]> GenerateStockByDepartmentReportExcel(StockByDepartmentReportQueryFilter filter);
+    Task<byte[]> GenerateDepartmentSummaryPdf(StockByDepartmentReportQueryFilter filter);
+    Task<byte[]> GenerateDepartmentSummaryExcel(StockByDepartmentReportQueryFilter filter);
     Task<List<KardexReportRowDto>> GetKardexReport(KardexReportQueryFilter filter);
     Task<byte[]> GenerateKardexReportPdf(KardexReportQueryFilter filter);
     Task<byte[]> GenerateKardexReportExcel(KardexReportQueryFilter filter);

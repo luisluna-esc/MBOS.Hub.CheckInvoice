@@ -109,6 +109,9 @@ public class DocumentReviewService : IDocumentReviewService
             .ToListAsync();
 
         var currentHash = await DocumentFingerprint.ComputeAsync(_unitOfWork, documentType, documentId);
+        var batchSiblings = documentType == DocumentReviews.Issue && !document.IsVoided
+            ? await BatchSiblingsAsync(documentId)
+            : [];
 
         return new ResponseGetObject
         {
@@ -117,6 +120,7 @@ public class DocumentReviewService : IDocumentReviewService
                 Status = document.GetStatus(),
                 Version = document.GetVersion(),
                 IsVoided = document.IsVoided,
+                BatchCount = batchSiblings.Count + 1,
                 Entries = rows.Select(row => new DocumentReviewEntryDto
                 {
                     Version = row.Review.Version,
@@ -191,6 +195,9 @@ public class DocumentReviewService : IDocumentReviewService
         }
 
         var now = DateTime.UtcNow;
+        // Al segundo: la base guarda microsegundos y el código de firma se recalcula después.
+        var at = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+        var trimmedReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         var version = document.GetVersion();
         await _unitOfWork.Repository<DocumentReview>().AddAsync(new DocumentReview
         {
@@ -199,9 +206,8 @@ public class DocumentReviewService : IDocumentReviewService
             Version = version,
             Action = action,
             UserId = user.AppUserId,
-            // Al segundo: la base guarda microsegundos y el código de firma se recalcula después.
-            At = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc),
-            Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
+            At = at,
+            Reason = trimmedReason,
             ContentHash = await DocumentFingerprint.ComputeAsync(_unitOfWork, documentType, documentId)
         });
 
@@ -217,7 +223,50 @@ public class DocumentReviewService : IDocumentReviewService
         }
 
         document.Update();
+
+        // Salida por lote: es un solo documento con una sola hoja de firmas, así que verificar,
+        // aprobar o rechazar firma a la vez las salidas del lote que están en el mismo paso. Una
+        // salida corregida o reabierta tiene otra versión y se firma sola. Reabrir es siempre de
+        // una sola salida (para corregir a ese pastor).
+        var batchSiblings = documentType == DocumentReviews.Issue && action != DocumentReviews.Reopened
+            ? await BatchSiblingsAsync(documentId)
+            : [];
+        foreach (var siblingId in batchSiblings.Select(b => b.IssueId))
+        {
+            // Por la clave, para usar la misma instancia que ya tenga cargada el contexto (la huella
+            // del contenido también lee la salida).
+            var sibling = (await _unitOfWork.Repository<Issue>().GetByIdAsync(siblingId))!;
+            await _unitOfWork.Repository<DocumentReview>().AddAsync(new DocumentReview
+            {
+                DocumentType = documentType,
+                DocumentId = sibling.IssueId,
+                Version = sibling.ReviewVersion,
+                Action = action,
+                UserId = user.AppUserId,
+                At = at,
+                Reason = trimmedReason,
+                ContentHash = await DocumentFingerprint.ComputeAsync(_unitOfWork, documentType, sibling.IssueId)
+            });
+
+            if (needsReason)
+            {
+                sibling.ReviewStatus = DocumentReviews.Entered;
+                sibling.ReviewVersion += 1;
+            }
+            else
+            {
+                sibling.ReviewStatus = action;
+            }
+
+            _unitOfWork.Repository<Issue>().Update(sibling);
+        }
+
         await _unitOfWork.SaveChangesAsync();
+
+        if (batchSiblings.Count > 0)
+        {
+            successMessage += $" Se firmaron juntas las {batchSiblings.Count + 1} salidas del lote.";
+        }
 
         return new ResponsePost
         {
@@ -225,6 +274,28 @@ public class DocumentReviewService : IDocumentReviewService
             Messages = [new Message { Type = MessageType.Success, Description = successMessage }],
             StatusCode = HttpStatusCode.OK
         };
+    }
+
+    // Las otras salidas del mismo lote que están en el mismo paso y la misma versión que esta.
+    private async Task<List<Issue>> BatchSiblingsAsync(long issueId)
+    {
+        var issue = await _unitOfWork.Repository<Issue>().Query()
+            .Where(i => i.IssueId == issueId)
+            .Select(i => new { i.IssueBatchId, i.ReviewStatus, i.ReviewVersion })
+            .FirstOrDefaultAsync();
+        if (issue?.IssueBatchId is null)
+        {
+            return [];
+        }
+
+        return await _unitOfWork.Repository<Issue>().Query()
+            .Where(i => i.IssueBatchId == issue.IssueBatchId
+                        && i.IssueId != issueId
+                        && !i.IsVoided
+                        && i.ReviewStatus == issue.ReviewStatus
+                        && i.ReviewVersion == issue.ReviewVersion)
+            .OrderBy(i => i.IssueId)
+            .ToListAsync();
     }
 
     private static ResponsePost Error(long id, string message, HttpStatusCode statusCode) => new()

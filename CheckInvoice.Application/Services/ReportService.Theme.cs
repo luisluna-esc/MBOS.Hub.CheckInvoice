@@ -152,6 +152,22 @@ public partial class ReportService
         container.PaddingTop(12).PaddingBottom(3).PaddingHorizontal(2)
             .DefaultTextStyle(x => x.FontColor(ReportAccent));
 
+    // Fila con los títulos de las columnas dentro del cuerpo de la tabla (además del encabezado de
+    // cada página), en letra chica. Alineación: 'L' izquierda, 'C' centro, 'R' derecha.
+    private static void ColumnTitles(TableDescriptor table, params (string Text, char Align)[] titles)
+    {
+        foreach (var (text, align) in titles)
+        {
+            var cell = table.Cell().Element(ColumnTitleCell);
+            cell = align switch { 'R' => cell.AlignRight(), 'C' => cell.AlignCenter(), _ => cell };
+            cell.Text(text);
+        }
+    }
+
+    private static IContainer ColumnTitleCell(IContainer container) =>
+        container.BorderBottom(0.5f).BorderColor(ReportLine).PaddingVertical(1.5f).PaddingHorizontal(2)
+            .DefaultTextStyle(x => x.FontSize(6.5f).SemiBold().FontColor(ReportMuted));
+
     private static IContainer SubGroupTitleCell(IContainer container) =>
         container.PaddingTop(3).PaddingBottom(3).PaddingHorizontal(2)
             .DefaultTextStyle(x => x.SemiBold().FontColor(ReportMuted));

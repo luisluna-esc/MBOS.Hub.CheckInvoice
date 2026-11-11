@@ -169,4 +169,28 @@ public partial class ReportService
         column.Item().PaddingTop(2).Text($"Versión V.{signatures.Version} del documento · Firma digital en reemplazo de la firma en papel.")
             .FontSize(6).FontColor(ReportMuted);
     }
+
+    // Salidas: tres firmas en una fila, como piden en almacén. A la izquierda quien aprueba
+    // (firma digital; sin ella queda el recuadro para firmar a mano), al centro el responsable
+    // de inventarios y a la derecha quien recibe.
+    private static void IssueSignatures(
+        ColumnDescriptor column, string receiverName, string? inventoryManagerName, DocumentSignatures signatures)
+    {
+        column.Item().PaddingTop(10).Row(row =>
+        {
+            row.Spacing(14);
+            row.RelativeItem().Column(c => DigitalSignatureBox(c, "APROBADO POR", signatures.Approved ?? signatures.Verified));
+            row.RelativeItem().Column(c => PaperSignatureBox(c, inventoryManagerName, "RESPONSABLE DE INVENTARIOS"));
+            row.RelativeItem().Column(c => PaperSignatureBox(c, receiverName, "RECIBÍ CONFORME"));
+        });
+        column.Item().PaddingTop(2).Text($"Versión V.{signatures.Version} del documento · Firma digital en reemplazo de la firma en papel.")
+            .FontSize(6).FontColor(ReportMuted);
+    }
+
+    // Recuadro para firmar a mano, del mismo alto que la firma digital, con el nombre abajo.
+    private static void PaperSignatureBox(ColumnDescriptor column, string? name, string title, float fontSize = 7)
+    {
+        column.Item().Element(SignatureCard).AlignBottom().AlignCenter().Text(name ?? " ").FontSize(fontSize);
+        SignatureCaption(column, title, fontSize);
+    }
 }

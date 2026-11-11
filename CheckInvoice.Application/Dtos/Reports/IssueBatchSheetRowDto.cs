@@ -19,4 +19,6 @@ public class IssueBatchSheetRowDto
     public string ProductName { get; set; } = string.Empty;
     public string? DepartmentName { get; set; }
     public decimal Quantity { get; set; }
+    public decimal UnitCost { get; set; }
+    public decimal TotalCost { get; set; }
 }

@@ -107,7 +107,8 @@ ON CONFLICT DO NOTHING;
 -- Reportes vuelve a su orden (sin este menú adentro).
 UPDATE menu c SET display_order = o.display_order
 FROM (VALUES
-    ('Historial de Salidas', 8),
+    ('Historial de Salidas', 7),
+    ('Ingresos de Almacén', 8),
     ('Salidas de Almacén', 9),
     ('Transferencias de Almacén', 10),
     ('Campo Pastor', 11),

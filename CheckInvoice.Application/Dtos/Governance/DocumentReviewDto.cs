@@ -5,6 +5,8 @@ public class DocumentReviewDto
     public string Status { get; set; } = string.Empty;
     public int Version { get; set; }
     public bool IsVoided { get; set; }
+    // Salida por lote: cuántas salidas del lote se firman juntas con esta (1 si no es de un lote).
+    public int BatchCount { get; set; } = 1;
     public List<DocumentReviewEntryDto> Entries { get; set; } = [];
 }
 

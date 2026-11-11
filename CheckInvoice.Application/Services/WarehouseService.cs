@@ -49,6 +49,12 @@ public class WarehouseService : IWarehouseService
             query = query.Where(w => w.IsActive == warehouseQueryFilter.IsActive.Value);
         }
 
+        if (warehouseQueryFilter.WithStock == true)
+        {
+            var stock = _unitOfWork.Repository<Stock>().Query();
+            query = query.Where(w => stock.Any(s => s.WarehouseId == w.WarehouseId && s.Quantity > 0));
+        }
+
         var totalRecords = await query.CountAsync();
 
         var warehouses = await query

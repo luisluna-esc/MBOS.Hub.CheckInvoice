@@ -101,6 +101,25 @@ public class ReportsController : ControllerBase
         return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "inventario-por-departamento.xlsx");
     }
 
+    // Resumen por Departamento: solo el saldo final de cada departamento.
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("department-summary/pdf")]
+    public async Task<IActionResult> GetDepartmentSummaryPdf([FromQuery] StockByDepartmentReportQueryFilter filter)
+    {
+        var pdfBytes = await _reportService.GenerateDepartmentSummaryPdf(filter);
+        return File(pdfBytes, "application/pdf", "resumen-por-departamento.pdf");
+    }
+
+    [Authorize(Policy = "report.view")]
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    [HttpGet("department-summary/excel")]
+    public async Task<IActionResult> GetDepartmentSummaryExcel([FromQuery] StockByDepartmentReportQueryFilter filter)
+    {
+        var excelBytes = await _reportService.GenerateDepartmentSummaryExcel(filter);
+        return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "resumen-por-departamento.xlsx");
+    }
+
     [Authorize(Policy = "report.view")]
     [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
     [HttpGet("stock-by-department/txt")]

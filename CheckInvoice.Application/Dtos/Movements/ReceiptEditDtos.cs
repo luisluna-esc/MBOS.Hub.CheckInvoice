@@ -39,6 +39,7 @@ public class ReceiptEditDto
     public string NoteNumber { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string Reason { get; set; } = string.Empty;
+    public long RequestedById { get; set; }
     public string? RequestedByName { get; set; }
     public DateTime RequestedAt { get; set; }
     public string? ReviewedByName { get; set; }

@@ -81,10 +81,16 @@ public partial class ReportService : IReportService
         return await _unitOfWork.SqlQueryAsync<StockReportRowDto>(
             GetStockReportSql,
             (object?)filter.WarehouseId ?? DBNull.Value,
-            DBNull.Value,
+            (object?)filter.DateFrom ?? DBNull.Value,
             (object?)filter.DateTo ?? DBNull.Value,
             ReviewStates.ForSql(filter.ReviewState));
     }
+
+    // Encabezado de Stock - Almacén: siempre es el saldo a la fecha fin; la fecha de inicio solo
+    // deja los productos que tuvieron movimiento desde esa fecha.
+    private static string StockDateInfo(StockReportQueryFilter filter) => filter.DateFrom.HasValue
+        ? $"Saldo al: {BalanceDateText(filter.DateTo)} (con movimiento desde {filter.DateFrom:dd/MM/yyyy})"
+        : $"Saldo al: {BalanceDateText(filter.DateTo)}";
 
     public async Task<byte[]> GenerateStockReportPdf(StockReportQueryFilter filter)
     {
@@ -106,8 +112,6 @@ public partial class ReportService : IReportService
             username = user?.Username ?? username;
         }
 
-        var balanceDate = BalanceDateText(filter.DateTo);
-
         var groups = rows
             .GroupBy(r => r.DepartmentName ?? "(Sin categoría)")
             .OrderBy(g => g.Key)
@@ -128,7 +132,7 @@ public partial class ReportService : IReportService
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(9));
 
-                page.Header().Element(c => ReportHeader(c, "Inventario General", $"Almacén: {warehouseName}", $"Saldo al: {balanceDate}", $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
+                page.Header().Element(c => ReportHeader(c, "Inventario General", $"Almacén: {warehouseName}", StockDateInfo(filter), $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
@@ -163,6 +167,8 @@ public partial class ReportService : IReportService
                         {
                             table.Cell().ColumnSpan(6).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
+                            // Títulos de las columnas otra vez en cada subcategoría: en hojas largas no se pierde qué es cada columna.
+                            ColumnTitles(table, ("Código", 'L'), ("Descripción", 'L'), ("Unidad de Medida", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'));
 
                             var subTotal = 0m;
 
@@ -204,6 +210,8 @@ public partial class ReportService : IReportService
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
+        // Para contar se necesita el saldo, nunca el movimiento de un periodo.
+        filter.DateFrom = null;
         var rows = await GetStockReport(filter);
 
         var warehouseName = "Todos los almacenes";
@@ -282,6 +290,8 @@ public partial class ReportService : IReportService
                         {
                             table.Cell().ColumnSpan(8).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
+                            // Títulos de las columnas otra vez en cada subcategoría: en hojas largas no se pierde qué es cada columna.
+                            ColumnTitles(table, ("Código", 'L'), ("Descripción", 'L'), ("Unidad de Medida", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'), ("Cantidad Física", 'R'), ("Diferencia", 'R'));
 
                             var subQty = 0m;
                             var subTotalValue = 0m;
@@ -744,6 +754,8 @@ public partial class ReportService : IReportService
                         {
                             table.Cell().ColumnSpan(8).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
+                            // Títulos de las columnas otra vez en cada subcategoría: en hojas largas no se pierde qué es cada columna.
+                            ColumnTitles(table, ("Código", 'L'), ("Descripción", 'L'), ("Unidad de Medida", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'), ("Cantidad Física", 'R'), ("Diferencia", 'R'));
 
                             decimal subQty = 0m, subTotalValue = 0m, subPhysicalQty = 0m, subDifference = 0m;
 
@@ -906,6 +918,8 @@ public partial class ReportService : IReportService
                         {
                             table.Cell().ColumnSpan(7).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
+                            // Títulos de las columnas otra vez en cada subcategoría: en hojas largas no se pierde qué es cada columna.
+                            ColumnTitles(table, ("N°", 'L'), ("Código", 'L'), ("Descripción", 'L'), ("Unidad de Medida", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'));
 
                             decimal subQty = 0m, subTotalValue = 0m;
 
@@ -1062,6 +1076,8 @@ public partial class ReportService : IReportService
                         {
                             table.Cell().ColumnSpan(8).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
+                            // Títulos de las columnas otra vez en cada subcategoría: en hojas largas no se pierde qué es cada columna.
+                            ColumnTitles(table, ("N° Nota", 'L'), ("Fecha", 'L'), ("Código", 'L'), ("Descripción", 'L'), ("Unidad de Medida", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'));
 
                             decimal subQty = 0m, subTotalValue = 0m;
 
@@ -1253,8 +1269,7 @@ public partial class ReportService : IReportService
             ], line.TotalCost)).ToList(),
             TotalLabel: "TOTAL (Bs.)",
             RowsOnLastPage: 30,
-            Signatures: column => DeliveryAndDigitalSignatures(
-                column, clientName, "RECIBÍ CONFORME", inventoryManagerName, "RESPONSABLE DE INVENTARIOS", signatures),
+            Signatures: column => IssueSignatures(column, clientName, inventoryManagerName, signatures),
             PrintedBy: username,
             Qr: qr));
     }
@@ -1705,94 +1720,70 @@ public partial class ReportService : IReportService
         {
             container.Page(page =>
             {
-                page.Size(PageSizes.Letter.Landscape());
+                page.Size(PageSizes.Letter);
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(8));
 
-                page.Header().Element(c => ReportHeader(c, "Kardex por Material", $"Producto: {productLabel}", $"Almacén: {warehouseName}", $"Periodo: {periodText}", $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
+                page.Header().Element(c => ReportHeader(c, "Kardex por Material", $"Almacén: {warehouseName}", $"Periodo: {periodText}", allProducts ? "Material: Todos los productos" : null, $"Estado: {ReviewStates.Label(filter.ReviewState)}"));
 
-                page.Content().PaddingTop(10).Table(table =>
+                // Como la ficha kardex en papel: por cada material, primero sus ingresos, debajo sus
+                // salidas y al final el saldo. Todo valorizado al costo promedio ponderado: cada
+                // ingreso recalcula el promedio (valor que había + valor que entra) / cantidad, y
+                // las salidas salen a ese promedio.
+                page.Content().PaddingTop(6).Column(column =>
                 {
-                    table.ColumnsDefinition(columns =>
-                    {
-                        columns.ConstantColumn(60);
-                        columns.ConstantColumn(62);
-                        columns.ConstantColumn(62);
-                        columns.ConstantColumn(68);
-                        columns.ConstantColumn(70);
-                        columns.ConstantColumn(62);
-                        columns.ConstantColumn(68);
-                        columns.ConstantColumn(70);
-                        columns.ConstantColumn(62);
-                        columns.ConstantColumn(68);
-                        columns.ConstantColumn(70);
-                    });
-
-                    table.Header(header =>
-                    {
-                        header.Cell().Element(HeaderCell).Text("");
-                        header.Cell().Element(HeaderCell).Text("");
-                        header.Cell().ColumnSpan(3).Element(HeaderCell).AlignCenter().Text("INGRESOS");
-                        header.Cell().ColumnSpan(3).Element(HeaderCell).AlignCenter().Text("SALIDAS");
-                        header.Cell().ColumnSpan(3).Element(HeaderCell).AlignCenter().Text("SALDOS");
-
-                        header.Cell().Element(HeaderCell).Text("Fecha");
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("N°\nComprobante");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Total");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Total");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
-                        header.Cell().Element(HeaderCell).AlignRight().Text("Total");
-                    });
-
                     if (sections.Count == 0)
                     {
-                        table.Cell().ColumnSpan(11).Element(BodyCell).Text("Sin movimientos ni saldo en este almacén y periodo.");
+                        column.Item().PaddingTop(10).Text("Sin movimientos ni saldo en este almacén y periodo.").FontColor(ReportMuted);
                     }
 
                     foreach (var (sectionLabel, opening, rows) in sections)
                     {
-                        // Con "Todos los productos", cada producto abre su bloque con su nombre.
-                        if (allProducts)
+                        column.Item().PaddingTop(12).Row(row =>
                         {
-                            table.Cell().ColumnSpan(11).Element(GroupTitleCell).Text(sectionLabel).Bold().FontSize(9);
+                            row.ConstantItem(62).Text("MATERIAL").Bold().FontColor(ReportAccent);
+                            row.RelativeItem().Text(sectionLabel).Bold();
+                        });
+
+                        if (opening.OpeningQuantity != 0 || opening.OpeningValue != 0)
+                        {
+                            var openingUnit = opening.OpeningQuantity == 0 ? 0 : opening.OpeningValue / opening.OpeningQuantity;
+                            column.Item().PaddingTop(3).Text(
+                                $"Saldo inicial al {filter.DateFrom:dd/MM/yyyy}:  cantidad {Qty(opening.OpeningQuantity)} · valor unitario {openingUnit.ToString("N2", ReportCulture)} · total {opening.OpeningValue.ToString("N2", ReportCulture)}")
+                                .FontColor(ReportMuted);
                         }
 
-                        var openingUnitValue = opening.OpeningQuantity == 0 ? 0 : opening.OpeningValue / opening.OpeningQuantity;
+                        KardexMovementsTable(column, "INGRESOS", rows.Where(r => r.MovementType == "receipt").ToList(), voucherLabel);
+                        KardexMovementsTable(column, "SALIDAS", rows.Where(r => r.MovementType != "receipt").ToList(), voucherLabel);
 
-                        table.Cell().Element(BodyCell).Text("");
-                        table.Cell().Element(BodyCell).Text("Saldo Inicial").Bold();
-                        table.Cell().Element(BodyCell).Text("");
-                        table.Cell().Element(BodyCell).Text("");
-                        table.Cell().Element(BodyCell).Text("");
-                        table.Cell().Element(BodyCell).Text("");
-                        table.Cell().Element(BodyCell).Text("");
-                        table.Cell().Element(BodyCell).Text("");
-                        table.Cell().Element(BodyCell).AlignRight().Text(Qty(opening.OpeningQuantity));
-                        table.Cell().Element(BodyCell).AlignRight().Text(openingUnitValue.ToString("N2", ReportCulture));
-                        table.Cell().Element(BodyCell).AlignRight().Text(opening.OpeningValue.ToString("N2", ReportCulture));
+                        // Saldo al final del periodo: el acumulado después del último movimiento (o el
+                        // saldo inicial si no hubo movimientos). Sin cantidad, se muestra el último costo.
+                        var last = rows.LastOrDefault();
+                        var balanceQuantity = last?.BalanceQuantity ?? opening.OpeningQuantity;
+                        var balanceValue = last?.BalanceValue ?? opening.OpeningValue;
+                        var balanceUnit = balanceQuantity != 0
+                            ? balanceValue / balanceQuantity
+                            : last?.UnitCost ?? 0;
 
-                        foreach (var row in rows)
+                        column.Item().PaddingTop(10).Text("SALDOS").Bold().FontColor(ReportAccent);
+                        column.Item().PaddingTop(3).AlignRight().Width(270).Table(table =>
                         {
-                            var isReceipt = row.MovementType == "receipt";
-                            var balanceUnitValue = row.BalanceQuantity == 0 ? 0 : row.BalanceValue / row.BalanceQuantity;
-
-                            table.Cell().Element(BodyCell).Text(row.VoucherDate.ToString("dd/MM/yyyy"));
-                            table.Cell().Element(BodyCell).Text(voucherLabel(row));
-                            table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? Qty(row.Quantity) : "");
-                            table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? row.UnitCost.ToString("N2", ReportCulture) : "");
-                            table.Cell().Element(BodyCell).AlignRight().Text(isReceipt ? row.TotalCost.ToString("N2", ReportCulture) : "");
-                            table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? Qty(row.Quantity) : "");
-                            table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? row.UnitCost.ToString("N2", ReportCulture) : "");
-                            table.Cell().Element(BodyCell).AlignRight().Text(!isReceipt ? row.TotalCost.ToString("N2", ReportCulture) : "");
-                            table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.BalanceQuantity));
-                            table.Cell().Element(BodyCell).AlignRight().Text(balanceUnitValue.ToString("N2", ReportCulture));
-                            table.Cell().Element(BodyCell).AlignRight().Text(row.BalanceValue.ToString("N2", ReportCulture));
-                        }
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                            });
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
+                                header.Cell().Element(HeaderCell).AlignRight().Text("Valor Unitario");
+                                header.Cell().Element(HeaderCell).AlignRight().Text("Total");
+                            });
+                            table.Cell().Element(CategoryTotalCell).AlignRight().Text(Qty(balanceQuantity)).Bold();
+                            table.Cell().Element(CategoryTotalCell).AlignRight().Text(balanceUnit.ToString("N2", ReportCulture)).Bold();
+                            table.Cell().Element(CategoryTotalCell).AlignRight().Text(balanceValue.ToString("N2", ReportCulture)).Bold();
+                        });
                     }
                 });
 
@@ -1801,6 +1792,53 @@ public partial class ReportService : IReportService
         });
 
         return WithTitle(document, "Kardex por Material").GeneratePdf();
+    }
+
+    // Tabla de ingresos o de salidas de un material, con su fila de totales.
+    private static void KardexMovementsTable(
+        QuestPDF.Fluent.ColumnDescriptor column, string title, List<KardexByProductReportRowDto> rows,
+        Func<KardexByProductReportRowDto, string> voucherLabel)
+    {
+        column.Item().PaddingTop(10).Text(title).Bold().FontColor(ReportAccent);
+        column.Item().PaddingTop(3).Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+            });
+            table.Header(header =>
+            {
+                header.Cell().Element(HeaderCell).AlignCenter().Text("N° Comprobante");
+                header.Cell().Element(HeaderCell).AlignCenter().Text("Fecha");
+                header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
+                header.Cell().Element(HeaderCell).AlignRight().Text("Valor Unitario");
+                header.Cell().Element(HeaderCell).AlignRight().Text("Total");
+            });
+
+            if (rows.Count == 0)
+            {
+                table.Cell().ColumnSpan(5).Element(BodyCell).Text("Sin movimientos en el periodo.").FontColor(ReportMuted);
+                return;
+            }
+
+            foreach (var row in rows)
+            {
+                table.Cell().Element(BodyCell).AlignCenter().Text(voucherLabel(row));
+                table.Cell().Element(BodyCell).AlignCenter().Text(row.VoucherDate.ToString("dd/MM/yyyy"));
+                table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.Quantity));
+                table.Cell().Element(BodyCell).AlignRight().Text(row.UnitCost.ToString("N2", ReportCulture));
+                table.Cell().Element(BodyCell).AlignRight().Text(row.TotalCost.ToString("N2", ReportCulture));
+            }
+
+            table.Cell().ColumnSpan(2).Element(SubtotalCell).Text("");
+            table.Cell().Element(SubtotalCell).AlignRight().Text(Qty(rows.Sum(r => r.Quantity))).Bold();
+            table.Cell().Element(SubtotalCell).Text("");
+            table.Cell().Element(SubtotalCell).AlignRight().Text(rows.Sum(r => r.TotalCost).ToString("N2", ReportCulture)).Bold();
+        });
     }
 
     private const string GetPastorFieldReceivablesSql = """
@@ -2221,7 +2259,7 @@ public partial class ReportService : IReportService
                 page.Margin(24);
                 page.DefaultTextStyle(x => x.FontColor(ReportInk).FontSize(6.5f));
 
-                page.Header().Element(c => ReportHeader(c, "Reporte General de Cuentas por Cobrar", $"Cliente: {clientName}", $"Estado: {statusLabel}", $"Fecha límite: {periodText}"));
+                page.Header().Element(c => ReportHeader(c, "Reporte General de Cuentas por Cobrar", $"Cliente: {clientName}", $"Estado: {statusLabel}", $"Corte: {periodText} (lo pendiente de antes se arrastra)"));
 
                 page.Content().PaddingTop(10).Column(mainColumn =>
                 {
