@@ -84,8 +84,8 @@ public class IssueVoidRequestService : IIssueVoidRequestService
             pageSize,
             (object?)issueVoidRequestQueryFilter.VoidReasonId ?? DBNull.Value,
             (object?)issueVoidRequestQueryFilter.RequestedByName ?? DBNull.Value,
-            (object?)issueVoidRequestQueryFilter.DateFrom?.Date ?? DBNull.Value,
-            (object?)issueVoidRequestQueryFilter.DateTo?.Date ?? DBNull.Value);
+            (issueVoidRequestQueryFilter.DateFrom is { } dateFrom ? DateOnly.FromDateTime(dateFrom) : (object)DBNull.Value),
+            (issueVoidRequestQueryFilter.DateTo is { } dateTo ? DateOnly.FromDateTime(dateTo) : (object)DBNull.Value));
 
         var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
 

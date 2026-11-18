@@ -77,8 +77,8 @@ public class ReceiptVoidRequestService : IReceiptVoidRequestService
             pageSize,
             (object?)receiptVoidRequestQueryFilter.VoidReasonId ?? DBNull.Value,
             (object?)receiptVoidRequestQueryFilter.RequestedByName ?? DBNull.Value,
-            (object?)receiptVoidRequestQueryFilter.DateFrom?.Date ?? DBNull.Value,
-            (object?)receiptVoidRequestQueryFilter.DateTo?.Date ?? DBNull.Value);
+            (receiptVoidRequestQueryFilter.DateFrom is { } dateFrom ? DateOnly.FromDateTime(dateFrom) : (object)DBNull.Value),
+            (receiptVoidRequestQueryFilter.DateTo is { } dateTo ? DateOnly.FromDateTime(dateTo) : (object)DBNull.Value));
 
         var totalRecords = rows.Count > 0 ? rows[0].TotalRecords : 0;
 

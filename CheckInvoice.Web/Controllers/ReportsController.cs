@@ -559,7 +559,8 @@ public class ReportsController : ControllerBase
     }
 
     [Authorize(Policy = "report.view")]
-    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador")]
+    // Caja también: es el "Ver detalle" de su pantalla Cuentas por Cobrar.
+    [Authorize(Roles = "M-BOS,Tesorero,Contador,Auxiliar Contador,Caja")]
     [HttpGet("account-receivable-voucher/{accountReceivableId}/pdf")]
     public async Task<IActionResult> GetAccountReceivableVoucherPdf(long accountReceivableId)
     {
