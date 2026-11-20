@@ -150,7 +150,7 @@ public partial class ReportService : IReportService
                     {
                         header.Cell().Element(HeaderCell).Text("Código");
                         header.Cell().Element(HeaderCell).Text("Descripción");
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
+                        header.Cell().Element(HeaderCell).AlignCenter().Text("Tipo de\nProducto");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
@@ -168,7 +168,7 @@ public partial class ReportService : IReportService
                             table.Cell().ColumnSpan(6).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
                             // Títulos de las columnas otra vez en cada subcategoría: en hojas largas no se pierde qué es cada columna.
-                            ColumnTitles(table, ("Código", 'L'), ("Descripción", 'L'), ("Unidad de Medida", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'));
+                            ColumnTitles(table, ("Código", 'L'), ("Descripción", 'L'), ("Tipo de Producto", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'));
 
                             var subTotal = 0m;
 
@@ -270,7 +270,7 @@ public partial class ReportService : IReportService
                     {
                         header.Cell().Element(HeaderCell).Text("Código");
                         header.Cell().Element(HeaderCell).Text("Descripción");
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
+                        header.Cell().Element(HeaderCell).AlignCenter().Text("Tipo de\nProducto");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
@@ -291,7 +291,7 @@ public partial class ReportService : IReportService
                             table.Cell().ColumnSpan(8).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
                             // Títulos de las columnas otra vez en cada subcategoría: en hojas largas no se pierde qué es cada columna.
-                            ColumnTitles(table, ("Código", 'L'), ("Descripción", 'L'), ("Unidad de Medida", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'), ("Cantidad Física", 'R'), ("Diferencia", 'R'));
+                            ColumnTitles(table, ("Código", 'L'), ("Descripción", 'L'), ("Tipo de Producto", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'), ("Cantidad Física", 'R'), ("Diferencia", 'R'));
 
                             var subQty = 0m;
                             var subTotalValue = 0m;
@@ -425,7 +425,7 @@ public partial class ReportService : IReportService
                     {
                         header.Cell().Element(HeaderCell).Text("Código");
                         header.Cell().Element(HeaderCell).Text("Descripción");
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
+                        header.Cell().Element(HeaderCell).AlignCenter().Text("Tipo de\nProducto");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
@@ -735,7 +735,7 @@ public partial class ReportService : IReportService
                     {
                         header.Cell().Element(HeaderCell).Text("Código");
                         header.Cell().Element(HeaderCell).Text("Descripción");
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
+                        header.Cell().Element(HeaderCell).AlignCenter().Text("Tipo de\nProducto");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
@@ -755,7 +755,7 @@ public partial class ReportService : IReportService
                             table.Cell().ColumnSpan(8).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
                             // Títulos de las columnas otra vez en cada subcategoría: en hojas largas no se pierde qué es cada columna.
-                            ColumnTitles(table, ("Código", 'L'), ("Descripción", 'L'), ("Unidad de Medida", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'), ("Cantidad Física", 'R'), ("Diferencia", 'R'));
+                            ColumnTitles(table, ("Código", 'L'), ("Descripción", 'L'), ("Tipo de Producto", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'), ("Cantidad Física", 'R'), ("Diferencia", 'R'));
 
                             decimal subQty = 0m, subTotalValue = 0m, subPhysicalQty = 0m, subDifference = 0m;
 
@@ -901,7 +901,7 @@ public partial class ReportService : IReportService
                         header.Cell().Element(HeaderCell).Text("N°");
                         header.Cell().Element(HeaderCell).Text("Código");
                         header.Cell().Element(HeaderCell).Text("Descripción");
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
+                        header.Cell().Element(HeaderCell).AlignCenter().Text("Tipo de\nProducto");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
@@ -919,7 +919,7 @@ public partial class ReportService : IReportService
                             table.Cell().ColumnSpan(7).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
                             // Títulos de las columnas otra vez en cada subcategoría: en hojas largas no se pierde qué es cada columna.
-                            ColumnTitles(table, ("N°", 'L'), ("Código", 'L'), ("Descripción", 'L'), ("Unidad de Medida", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'));
+                            ColumnTitles(table, ("N°", 'L'), ("Código", 'L'), ("Descripción", 'L'), ("Tipo de Producto", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'));
 
                             decimal subQty = 0m, subTotalValue = 0m;
 
@@ -1059,7 +1059,7 @@ public partial class ReportService : IReportService
                         header.Cell().Element(HeaderCell).Text("Fecha");
                         header.Cell().Element(HeaderCell).Text("Código");
                         header.Cell().Element(HeaderCell).Text("Descripción");
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
+                        header.Cell().Element(HeaderCell).AlignCenter().Text("Tipo de\nProducto");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
@@ -1077,13 +1077,13 @@ public partial class ReportService : IReportService
                             table.Cell().ColumnSpan(8).Element(SubGroupTitleCell)
                                 .Text(sub.Key).FontSize(9);
                             // Títulos de las columnas otra vez en cada subcategoría: en hojas largas no se pierde qué es cada columna.
-                            ColumnTitles(table, ("N° Nota", 'L'), ("Fecha", 'L'), ("Código", 'L'), ("Descripción", 'L'), ("Unidad de Medida", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'));
+                            ColumnTitles(table, ("N° Nota", 'L'), ("Fecha", 'L'), ("Código", 'L'), ("Descripción", 'L'), ("Tipo de Producto", 'C'), ("Cantidad", 'R'), ("Costo Unitario", 'R'), ("Costo Total", 'R'));
 
                             decimal subQty = 0m, subTotalValue = 0m;
 
                             foreach (var row in sub.OrderBy(r => r.Name).ThenBy(r => r.ReceiptId))
                             {
-                                table.Cell().Element(BodyCell).Text(noteNumbers.GetValueOrDefault(row.ReceiptId, row.ReceiptId.ToString()));
+                                table.Cell().Element(BodyCell).Text(t => DocumentNumber(t, noteNumbers.GetValueOrDefault(row.ReceiptId, row.ReceiptId.ToString()), 7, ReportInk, bold: false));
                                 table.Cell().Element(BodyCell).Text(row.ReceiptDate.ToString("dd/MM/yyyy"));
                                 table.Cell().Element(BodyCell).Text(row.Code ?? "");
                                 table.Cell().Element(BodyCell).Text(row.Name);
@@ -1253,7 +1253,7 @@ public partial class ReportService : IReportService
             [
                 new VoucherColumn("CÓDIGO", 50),
                 new VoucherColumn("DESCRIPCIÓN", null),
-                new VoucherColumn("UNIDAD", 54, AlignCenter: true),
+                new VoucherColumn("TIPO DE\nPRODUCTO", 54, AlignCenter: true),
                 new VoucherColumn("CANTIDAD", 46, AlignRight: true),
                 new VoucherColumn("COSTO\nUNIT. (Bs.)", 56, AlignRight: true),
                 new VoucherColumn("COSTO\nTOTAL (Bs.)", 62, AlignRight: true),
@@ -1541,7 +1541,7 @@ public partial class ReportService : IReportService
             Columns:
             [
                 new VoucherColumn("CANTIDAD", 50, AlignRight: true),
-                new VoucherColumn("UNIDAD", 54, AlignCenter: true),
+                new VoucherColumn("TIPO DE\nPRODUCTO", 54, AlignCenter: true),
                 new VoucherColumn("DESCRIPCIÓN", null),
                 new VoucherColumn("DEPT.", 80),
                 new VoucherColumn("COSTO\nUNIT. (Bs.)", 56, AlignRight: true),
@@ -1827,7 +1827,7 @@ public partial class ReportService : IReportService
 
             foreach (var row in rows)
             {
-                table.Cell().Element(BodyCell).AlignCenter().Text(voucherLabel(row));
+                table.Cell().Element(BodyCell).AlignCenter().Text(t => DocumentNumber(t, voucherLabel(row), 8, ReportInk, bold: false));
                 table.Cell().Element(BodyCell).AlignCenter().Text(row.VoucherDate.ToString("dd/MM/yyyy"));
                 table.Cell().Element(BodyCell).AlignRight().Text(Qty(row.Quantity));
                 table.Cell().Element(BodyCell).AlignRight().Text(row.UnitCost.ToString("N2", ReportCulture));
@@ -2290,7 +2290,7 @@ public partial class ReportService : IReportService
                             header.Cell().Element(HeaderCell).Text("Fecha\nLímite");
                             header.Cell().Element(HeaderCell).Text("Código");
                             header.Cell().Element(HeaderCell).Text("Descripción");
-                            header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad de\nMedida");
+                            header.Cell().Element(HeaderCell).AlignCenter().Text("Tipo de\nProducto");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                             header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
@@ -2460,7 +2460,7 @@ public partial class ReportService : IReportService
                             header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CÓDIGO");
                             header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DEPT.");
                             header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("DESCRIPCIÓN");
-                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("UNIDAD\nDE MEDIDA");
+                            header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("TIPO DE\nPRODUCTO");
                             header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("CANTIDAD");
                             header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("COSTO\nUNITARIO (Bs.)");
                             header.Cell().Element(VoucherHeaderCell).AlignCenter().Text("COSTO\nTOTAL (Bs.)");
@@ -2625,7 +2625,7 @@ public partial class ReportService : IReportService
             var match = raw.FirstOrDefault(r => r.Year == month.Year && r.Month == month.Month);
             result.Add(new MonthlyTotalDto
             {
-                MonthLabel = month.ToString("MMM yyyy", ReportCulture),
+                MonthLabel = month.ToString("MMM", ReportCulture),
                 Total = match?.Total ?? 0
             });
         }

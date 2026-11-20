@@ -271,7 +271,7 @@ public partial class ReportService
                             {
                                 header.Cell().Element(NoteHeaderCell).AlignCenter().Text("CÓDIGO");
                                 header.Cell().Element(NoteHeaderCell).AlignCenter().Text("DESCRIPCIÓN");
-                                header.Cell().Element(NoteHeaderCell).AlignCenter().Text("UNIDAD");
+                                header.Cell().Element(NoteHeaderCell).AlignCenter().Text("TIPO DE\nPRODUCTO");
                                 header.Cell().Element(NoteHeaderCell).AlignCenter().Text("CANTIDAD");
                                 if (isRetention)
                                 {

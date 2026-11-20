@@ -12,6 +12,9 @@
 
     <ItemGroup>
       <EmbeddedResource Include="Resources\mbos-logo.png" />
+      <!-- Fuente del N° de documento: su "I" tiene remates y no se confunde con un 1 (licencia SIL OFL). -->
+      <EmbeddedResource Include="Resources\IBMPlexSans-Regular.ttf" />
+      <EmbeddedResource Include="Resources\IBMPlexSans-Bold.ttf" />
     </ItemGroup>
 
     <ItemGroup>

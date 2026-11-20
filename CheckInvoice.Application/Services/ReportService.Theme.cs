@@ -1,3 +1,4 @@
+using QuestPDF.Drawing;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -136,6 +137,33 @@ public partial class ReportService
             .PaddingVertical(4).PaddingHorizontal(3).MinHeight(22).AlignMiddle()
             .DefaultTextStyle(x => x.SemiBold().FontColor(ReportAccent));
 
+    // Tipografía del N° de documento. En la fuente normal de los reportes la "I" de las entradas
+    // ("I 15-10-26") es un palito que se lee como un 1; en IBM Plex Sans la "I" tiene remates.
+    // La fuente va embebida en el proyecto porque el servidor no tiene fuentes instaladas.
+    private const string DocumentNumberFont = "IBM Plex Sans";
+
+    private static readonly Lazy<bool> DocumentNumberFontLoaded = new(() =>
+    {
+        var assembly = typeof(ReportService).Assembly;
+        foreach (var file in new[] { "IBMPlexSans-Regular.ttf", "IBMPlexSans-Bold.ttf" })
+        {
+            using var stream = assembly.GetManifestResourceStream($"CheckInvoice.Application.Resources.{file}")
+                ?? throw new InvalidOperationException($"Fuente embebida (Resources/{file}) no encontrada.");
+            FontManager.RegisterFont(stream);
+        }
+        return true;
+    });
+
+    private static void DocumentNumber(TextDescriptor text, string number, float fontSize, string color, bool bold)
+    {
+        _ = DocumentNumberFontLoaded.Value;
+        var span = text.Span(number).FontFamily(DocumentNumberFont).FontSize(fontSize).FontColor(color);
+        if (bold)
+        {
+            span.Bold();
+        }
+    }
+
     private static IContainer BodyCell(IContainer container) =>
         container.BorderBottom(0.5f).BorderColor(ReportLine).PaddingVertical(3.5f).PaddingHorizontal(3);
 
@@ -222,7 +250,7 @@ public partial class ReportService
                 row.ConstantItem(100).Background(ReportHeaderFill).CornerRadius(4).PaddingVertical(4).PaddingHorizontal(3).AlignMiddle().Column(c =>
                 {
                     c.Item().AlignCenter().Text(numberLabel).FontSize(6).SemiBold().FontColor(ReportMuted);
-                    c.Item().AlignCenter().Text(numberText).Bold().FontSize(12.5f).FontColor(ReportAccent);
+                    c.Item().AlignCenter().Text(t => DocumentNumber(t, numberText, 12.5f, ReportAccent, bold: true));
                     if (numberSubText is not null)
                     {
                         c.Item().AlignCenter().Text(numberSubText).FontSize(6).FontColor(ReportMuted);

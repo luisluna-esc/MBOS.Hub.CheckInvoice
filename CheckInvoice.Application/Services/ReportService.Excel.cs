@@ -101,7 +101,7 @@ public partial class ReportService
             new("Subdepartamento", r => r.SubDepartmentName ?? "(Sin subcategoría)"),
             new("Código", r => r.Code),
             new("Descripción", r => r.Name),
-            new("Unidad de medida", r => r.UnitMeasure),
+            new("Tipo de producto", r => r.UnitMeasure),
             new("Cantidad", r => r.Quantity, QuantityFormat, Total: true),
             new("Costo unitario", r => r.UnitValue ?? 0, MoneyFormat),
             new("Costo total", r => r.TotalValue, MoneyFormat, Total: true),
@@ -128,7 +128,7 @@ public partial class ReportService
             new("Subdepartamento", r => r.SubDepartmentName ?? "(Sin subcategoría)"),
             new("Código", r => r.Code),
             new("Descripción", r => r.Name),
-            new("Unidad de medida", r => r.UnitMeasure),
+            new("Tipo de producto", r => r.UnitMeasure),
             new("Cantidad", r => r.Quantity, QuantityFormat, Total: true),
             new("Costo unitario", r => r.UnitCost, MoneyFormat),
             new("Costo total", r => r.TotalCost, MoneyFormat, Total: true)
@@ -155,7 +155,7 @@ public partial class ReportService
             new("Subdepartamento", r => r.SubDepartmentName ?? "(Sin subcategoría)"),
             new("Código", r => r.Code),
             new("Descripción", r => r.Name),
-            new("Unidad de medida", r => r.UnitMeasure),
+            new("Tipo de producto", r => r.UnitMeasure),
             new("Cantidad", r => r.Quantity, QuantityFormat, Total: true),
             new("Costo unitario", r => r.UnitCost, MoneyFormat),
             new("Costo total", r => r.TotalCost, MoneyFormat, Total: true)
@@ -308,7 +308,7 @@ public partial class ReportService
         [
             new("Código", r => r.Code),
             new("Descripción", r => r.Name),
-            new("Unidad de medida", r => r.UnitMeasure),
+            new("Tipo de producto", r => r.UnitMeasure),
             new("Cantidad", r => r.Quantity, QuantityFormat, Total: true),
             new("Costo unitario", r => r.UnitCost, MoneyFormat),
             new("Costo total", r => r.TotalCost, MoneyFormat, Total: true),
@@ -326,7 +326,7 @@ public partial class ReportService
         new("Subdepartamento", r => r.SubDepartmentName ?? "(Sin subcategoría)"),
         new("Código", r => r.Code),
         new("Descripción", r => r.Name),
-        new("Unidad de medida", r => r.UnitMeasure),
+        new("Tipo de producto", r => r.UnitMeasure),
         new("Cantidad", r => r.NetQuantity, QuantityFormat),
         new("Costo unitario", r => r.UnitValue, MoneyFormat),
         new("Costo total", r => r.TotalValue, MoneyFormat, Total: true)

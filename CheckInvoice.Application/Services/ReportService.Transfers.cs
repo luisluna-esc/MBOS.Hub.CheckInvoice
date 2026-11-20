@@ -135,7 +135,7 @@ public partial class ReportService
                     table.Header(header =>
                     {
                         header.Cell().Element(HeaderCell).AlignRight().Text("Cantidad");
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad");
+                        header.Cell().Element(HeaderCell).AlignCenter().Text("Tipo de\nProducto");
                         header.Cell().Element(HeaderCell).Text("Descripción");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nUnitario");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Costo\nTotal");
@@ -192,7 +192,7 @@ public partial class ReportService
             new("Destino", r => r.DestinationWarehouseName),
             new("Envía", r => r.SenderName),
             new("Cantidad", r => r.Quantity, QuantityFormat, Total: true),
-            new("Unidad", r => r.UnitMeasure),
+            new("Tipo de producto", r => r.UnitMeasure),
             new("Descripción", r => r.Name),
             new("Costo unitario", r => r.UnitCost, MoneyFormat),
             new("Costo total", r => r.TotalCost, MoneyFormat, Total: true),

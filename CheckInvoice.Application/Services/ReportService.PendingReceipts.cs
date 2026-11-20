@@ -64,7 +64,7 @@ public partial class ReportService
                     {
                         header.Cell().Element(HeaderCell).Text("Código");
                         header.Cell().Element(HeaderCell).Text("Material");
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("Unidad");
+                        header.Cell().Element(HeaderCell).AlignCenter().Text("Tipo de\nProducto");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Recibido");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Entregado");
                         header.Cell().Element(HeaderCell).AlignRight().Text("Queda");
